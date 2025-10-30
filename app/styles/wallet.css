@@ -1,0 +1,9 @@
+/* Override default z-index for wallet modal */
+.wallet-adapter-modal {
+  z-index: 1000 !important; /* This should be higher than the Dialog's z-index */
+}
+
+/* Ensure the wallet button is also above the dialog */
+.wallet-adapter-button-trigger {
+  z-index: 100;
+}
