@@ -1,3 +1,9 @@
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Development
 .anchor
 .DS_Store
 target
@@ -9,4 +15,3 @@ encrypted-ixs/arcis_temp_target
 build
 encrypted-ixs/src/main.rs
 artifacts/
-app/.env.local

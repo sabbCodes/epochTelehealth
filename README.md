@@ -1,116 +1,164 @@
-# Structure of this project
+# Arcium Integration Guide
 
-This project is structured pretty similarly to how a regular Solana Anchor project is structured. The main difference lies in there being two places to write code here:
+This document explains how the Arcium encryption is integrated into the Epoch Telehealth platform.
 
-- The `programs` dir like usual Anchor programs
-- The `encrypted-ixs` dir for confidential computing instructions
+## Overview
 
-When working with plaintext data, we can edit it inside our program as normal. When working with confidential data though, state transitions take place off-chain using the Arcium network as a co-processor. For this, we then always need two instructions in our program: one that gets called to initialize a confidential computation, and one that gets called when the computation is done and supplies the resulting data. Additionally, since the types and operations in a Solana program and in a confidential computing environment are a bit different, we define the operations themselves in the `encrypted-ixs` dir using our Rust-based framework called Arcis. To link all of this together, we provide a few macros that take care of ensuring the correct accounts and data are passed for the specific initialization and callback functions:
+The platform uses Arcium's MPC (Multi-Party Computation) encryption to securely store medical records on the Solana blockchain. All sensitive medical data is encrypted before being stored on-chain.
 
-```rust
-// encrypted-ixs/add_together.rs
+## Architecture
 
-use arcis_imports::*;
+### Components
 
-#[encrypted]
-mod circuits {
-    use arcis_imports::*;
+1. **Solana Program** (`programs/epoch_telehealth/src/lib.rs`)
+   - `store_medical_record`: Stores encrypted medical records on-chain
+   - `share_medical_record`: Shares encrypted records with authorized providers
+   - `share_medical_record_callback`: Handles the callback after MPC computation
 
-    pub struct InputValues {
-        v1: u8,
-        v2: u8,
-    }
+2. **Frontend Form** (`app/components/health-record-form.tsx`)
+   - Collects medical record data from healthcare providers
+   - Encrypts data using Arcium's RescueCipher
+   - Submits encrypted data to the Solana program
 
-    #[instruction]
-    pub fn add_together(input_ctxt: Enc<Shared, InputValues>) -> Enc<Shared, u16> {
-        let input = input_ctxt.to_arcis();
-        let sum = input.v1 as u16 + input.v2 as u16;
-        input_ctxt.owner.from_arcis(sum)
-    }
-}
+3. **Utility Functions** (`app/utils/arcium-helpers.ts`)
+   - Reusable encryption/decryption functions
+   - Helper functions for account derivation
 
-// programs/my_program/src/lib.rs
+## How It Works
 
-use anchor_lang::prelude::*;
-use arcium_anchor::prelude::*;
+### Storing Medical Records
 
-declare_id!("<some ID>");
+1. **Data Collection**: Healthcare provider fills out the form with:
+   - Patient ID
+   - Diagnosis
+   - Symptoms
+   - Treatment plan
+   - Medications
+   - Additional notes
 
-#[arcium_program]
-pub mod my_program {
-    use super::*;
+2. **Encryption Process**:
+   ```typescript
+   // Get MXE public key from Arcium
+   const mxePublicKey = await getMXEPublicKey(provider, programId);
+   
+   // Generate ephemeral key pair
+   const privateKey = x25519.utils.randomSecretKey();
+   const publicKey = x25519.getPublicKey(privateKey);
+   
+   // Create shared secret
+   const sharedSecret = x25519.getSharedSecret(privateKey, mxePublicKey);
+   
+   // Initialize cipher
+   const cipher = new RescueCipher(sharedSecret);
+   
+   // Hash and encrypt data
+   const medicalData = [
+     await hashToU64(patientId),
+     await hashToU64(doctorId),
+     await hashToU64(consultationDate),
+     await hashToU64(diagnosis),
+     await hashToU64(symptoms),
+     await hashToU64(treatment),
+     await hashToU64(medications),
+     await hashToU64(notes),
+   ];
+   
+   const ciphertext = cipher.encrypt(medicalData, nonce);
+   ```
 
-    pub fn init_add_together_comp_def(ctx: Context<InitAddTogetherCompDef>) -> Result<()> {
-        init_comp_def(ctx.accounts, true, 0, None, None)?;
-        Ok(())
-    }
+3. **On-Chain Storage**:
+   - Encrypted data is stored in a PDA (Program Derived Address)
+   - PDA is derived from: `["medical_record", doctor_wallet_pubkey]`
+   - Only the encrypted ciphertext is stored on-chain
 
-    pub fn add_together(
-        ctx: Context<AddTogether>,
-        computation_offset: u64,
-        ciphertext_0: [u8; 32],
-        ciphertext_1: [u8; 32],
-        pub_key: [u8; 32],
-        nonce: u128,
-    ) -> Result<()> {
-        let args = vec![
-            Argument::ArcisPubkey(pub_key),
-            Argument::PlaintextU128(nonce),
-            Argument::EncryptedU8(ciphertext_0),
-            Argument::EncryptedU8(ciphertext_1),
-        ];
-        ctx.accounts.sign_pda_account.bump = ctx.bumps.sign_pda_account;
-        queue_computation(
-            ctx.accounts,
-            computation_offset,
-            args,
-            None,
-            vec![AddTogetherCallback::callback_ix(&[])],
-        )?;
-        Ok(())
-    }
+### Sharing Medical Records
 
-    #[arcium_callback(encrypted_ix = "add_together")]
-    pub fn add_together_callback(
-        ctx: Context<AddTogetherCallback>,
-        output: ComputationOutputs<AddTogetherOutput>,
-    ) -> Result<()> {
-        let o = match output {
-            ComputationOutputs::Success(AddTogetherOutput { field_0: o }) => o,
-            _ => return Err(ErrorCode::AbortedComputation.into()),
-        };
+To share a medical record with another healthcare provider:
 
-        emit!(SumEvent {
-            sum: o.ciphertexts[0],
-            nonce: o.nonce.to_le_bytes(),
-        });
-        Ok(())
-    }
-}
+1. Generate receiver's key pair
+2. Call `share_medical_record` instruction with:
+   - Computation offset (unique identifier)
+   - Receiver's public key
+   - Receiver's nonce
+   - Sender's public key
+   - Original nonce
 
-#[queue_computation_accounts("add_together", payer)]
-#[derive(Accounts)]
-#[instruction(computation_offset: u64)]
-pub struct AddTogether<'info> {
-    #[account(mut)]
-    pub payer: Signer<'info>,
-    // ... other required accounts
-}
+3. Arcium's MXE performs the computation off-chain
+4. Callback instruction emits an event with re-encrypted data
+5. Receiver can decrypt using their private key
 
-#[callback_accounts("add_together", payer)]
-#[derive(Accounts)]
-pub struct AddTogetherCallback<'info> {
-    #[account(mut)]
-    pub payer: Signer<'info>,
-    // ... other required accounts
-    pub some_extra_acc: AccountInfo<'info>,
-}
+## Setup Instructions
 
-#[init_computation_definition_accounts("add_together", payer)]
-#[derive(Accounts)]
-pub struct InitAddTogetherCompDef<'info> {
-    #[account(mut)]
-    pub payer: Signer<'info>,
-    // ... other required accounts
-}
+### Prerequisites
+
+1. Install dependencies:
+   ```bash
+   cd app
+   npm install
+   ```
+
+2. Ensure you have the Arcium program deployed on devnet/mainnet
+
+### Configuration
+
+1. Update the program ID in `app/components/epoch_telehealth.json`
+2. Set the cluster offset for your Arcium cluster (see tests for example)
+
+### Running the Application
+
+1. Start the Next.js development server:
+   ```bash
+   npm run dev
+   ```
+
+2. Connect your Solana wallet (Phantom, Solflare, etc.)
+
+3. Fill out the medical record form and submit
+
+4. The transaction will:
+   - Encrypt the data
+   - Create a PDA for the medical record
+   - Store the encrypted data on-chain
+   - Return a transaction signature
+
+## Security Considerations
+
+1. **Data Privacy**: All medical data is encrypted before leaving the browser
+2. **Key Management**: Ephemeral keys are generated per transaction
+3. **Access Control**: Only authorized parties can decrypt shared records
+4. **On-Chain Storage**: Only encrypted ciphertexts are stored on-chain
+
+## Testing
+
+Run the test suite to verify the integration:
+
+```bash
+anchor test
 ```
+
+The test file (`tests/epoch_telehealth.ts`) demonstrates:
+- Storing encrypted medical records
+- Sharing records with another provider
+- Decrypting received records
+- Verifying data integrity
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Wallet not connected**: Ensure a Solana wallet is connected before submitting
+2. **MXE not initialized**: Make sure the MXE account is properly set up
+3. **Insufficient SOL**: Ensure the wallet has enough SOL for transaction fees
+4. **Computation definition not initialized**: Run `init_share_record_comp_def` first
+
+### Error Messages
+
+- `"Wallet not connected"`: Connect a Solana wallet
+- `"Failed to store medical record"`: Check console for detailed error
+- `"Invalid medical record data format"`: Ensure all required fields are filled
+
+## Resources
+
+- [Arcium Documentation](https://docs.arcium.com)
+- [Anchor Documentation](https://www.anchor-lang.com)
+- [Solana Web3.js](https://solana-labs.github.io/solana-web3.js/)
