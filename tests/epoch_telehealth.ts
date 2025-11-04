@@ -32,6 +32,8 @@ describe("EpochTelehealth", () => {
   // const program = anchor.workspace.EpochTelehealth as Program<EpochTelehealth>;
   // const provider = anchor.getProvider();
 
+  // const arciumEnv = getArciumEnv();
+
   // Devnet configuration
   const connection = new anchor.web3.Connection(
     "https://api.devnet.solana.com",
@@ -102,6 +104,7 @@ describe("EpochTelehealth", () => {
     // We convert them to u64 hashes for the encrypted circuit and RescueCipher
     const uuidPatient = randomUUID();
     const uuidDoctor = randomUUID();
+    const uuidRecord = randomUUID();
     const consultationDateStr = new Date().toISOString();
     const diagnosisText = "Acute bronchitis - patient reports cough and fever";
     const symptomsText = "Cough, fever, sore throat";
@@ -122,6 +125,7 @@ describe("EpochTelehealth", () => {
 
     const patientId = hashToU64(uuidPatient);
     const doctorId = hashToU64(uuidDoctor);
+    const recordId = hashToU64(uuidRecord);
     const consultationDate = hashToU64(consultationDateStr);
     const diagnosis = hashToU64(diagnosisText);
     const symptoms = hashToU64(symptomsText);
@@ -130,6 +134,7 @@ describe("EpochTelehealth", () => {
     const notes = hashToU64(notesText);
 
     const medicalData = [
+      recordId,
       patientId,
       doctorId,
       consultationDate,
@@ -154,7 +159,8 @@ describe("EpochTelehealth", () => {
         ciphertext[4],
         ciphertext[5],
         ciphertext[6],
-        ciphertext[7]
+        ciphertext[7],
+        ciphertext[8]
       )
       .rpc({ commitment: "confirmed" });
     console.log("Store signature is ", storeSig);
@@ -181,6 +187,7 @@ describe("EpochTelehealth", () => {
           program.programId,
           computationOffset
         ),
+        // clusterAccount: arciumEnv.arciumClusterPubkey,
         clusterAccount: clusterAccount,
 
         mxeAccount: getMXEAccAddress(program.programId),

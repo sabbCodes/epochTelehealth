@@ -1,7 +1,9 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/chat/doctor/page": "app/chat/doctor/page.js",
+  "/records/page": "app/records/page.js",
   "/dashboard/page": "app/dashboard/page.js",
+  "/ai-chat/page": "app/ai-chat/page.js",
+  "/doctor-dashboard/page": "app/doctor-dashboard/page.js",
   "/pharmacy-dashboard/page": "app/pharmacy-dashboard/page.js",
   "/favicon.ico/route": "app/favicon.ico/route.js"
 }

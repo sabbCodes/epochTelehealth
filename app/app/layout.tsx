@@ -10,7 +10,7 @@ import ClientLayout from "./client-layout";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "teleHealthSol - Healthcare Without Borders",
+  title: "epochTeleHealth - Healthcare Without Borders",
   description:
     "Connect with world-class doctors from anywhere. Secure your medical records on blockchain.",
   generator: "v0.dev",

@@ -3,7 +3,7 @@ use arcium_anchor::prelude::*;
 
 const COMP_DEF_OFFSET_SHARE_RECORD: u32 = comp_def_offset("share_medical_record");
 
-declare_id!("B1mNWS9JxnwBhehnrAYQCYVddr7pSf7Atv9pH9ntikfz");
+declare_id!("C3BUuszcSAug8yp589QGV8xa7DpqLbPyRAm9qzJSMs3A");
 
 #[arcium_program]
 pub mod epoch_telehealth {
@@ -15,6 +15,7 @@ pub mod epoch_telehealth {
     /// decrypted by authorized parties (patient and authorized healthcare providers).
     pub fn store_medical_record(
         ctx: Context<StoreMedicalRecord>,
+        _record_id: [u8; 32],
         patient_id: [u8; 32],
         doctor_id: [u8; 32],
         consultation_date: [u8; 32],
@@ -105,15 +106,20 @@ pub mod epoch_telehealth {
 
 /// Stores the account that receives shared medical record data
 #[derive(Accounts)]
+#[instruction(record_id: u64)]
 pub struct StoreMedicalRecord<'info> {
     #[account(mut)]
-    pub payer: Signer<'info>,
+    pub doctor: Signer<'info>,
     pub system_program: Program<'info, System>,
     #[account(
         init,
-        payer = payer,
+        payer = doctor,
         space = 8 + MedicalRecord::INIT_SPACE,
-        seeds = [b"medical_record", payer.key().as_ref()],
+        seeds = [
+            b"medical_record",
+            doctor.key().as_ref(),
+            &record_id.to_le_bytes()
+        ],
         bump,
     )]
     pub medical_record: Account<'info, MedicalRecord>,

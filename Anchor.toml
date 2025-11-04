@@ -5,11 +5,11 @@ package_manager = "yarn"
 resolution = true
 skip-lint = false
 
-[programs.localnet]
-epoch_telehealth = "B1mNWS9JxnwBhehnrAYQCYVddr7pSf7Atv9pH9ntikfz"
-
 [programs.devnet]
-epoch_telehealth = "B1mNWS9JxnwBhehnrAYQCYVddr7pSf7Atv9pH9ntikfz"
+epoch_telehealth = "C3BUuszcSAug8yp589QGV8xa7DpqLbPyRAm9qzJSMs3A"
+
+[programs.localnet]
+epoch_telehealth = "C3BUuszcSAug8yp589QGV8xa7DpqLbPyRAm9qzJSMs3A"
 
 [registry]
 url = "https://api.apr.dev"
@@ -21,7 +21,16 @@ wallet = "~/.config/solana/id.json"
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
 
-[test.validator]
+[test]
+startup_wait = 5000
+shutdown_wait = 2000
+upgradeable = false
+
 [[test.genesis]]
 address = "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6"
 program = "/home/sabb/epoch_telehealth/artifacts/arcium_program_0.3.0.so"
+
+[test.validator]
+bind_address = "0.0.0.0"
+ledger = ".anchor/test-ledger"
+rpc_port = 8899
