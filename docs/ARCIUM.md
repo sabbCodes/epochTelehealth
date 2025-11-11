@@ -68,7 +68,7 @@ The platform uses Arcium's MPC (Multi-Party Computation) encryption to securely 
 
 3. **On-Chain Storage**:
    - Encrypted data is stored in a PDA (Program Derived Address)
-   - PDA is derived from: `["medical_record", doctor_wallet_pubkey]`
+   - PDA is derived from: `["medical_record", doctor_wallet_pubkey, record_id]`
    - Only the encrypted ciphertext is stored on-chain
 
 ### Sharing Medical Records

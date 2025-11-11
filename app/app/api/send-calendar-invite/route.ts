@@ -18,7 +18,7 @@ interface RequestBody {
 export async function POST(request: Request) {
   try {
     const body: RequestBody = await request.json();
-    
+
     console.log('Received calendar invite request:', {
       to: body.to,
       recipientType: body.recipientType,
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       if (!emailResult.success) {
         throw emailResult.error || new Error('Failed to send email');
       }
-      
+
       console.log('Email sent successfully');
     } catch (emailError) {
       console.error('Email sending error:', {
@@ -61,9 +61,9 @@ export async function POST(request: Request) {
         message: emailError instanceof Error ? emailError.message : 'Unknown error',
         stack: emailError instanceof Error ? emailError.stack : undefined
       });
-      
+
       return NextResponse.json(
-        { 
+        {
           error: 'Failed to send email confirmation',
           details: emailError instanceof Error ? emailError.message : 'Unknown error',
           code: 'EMAIL_SEND_FAILED'
@@ -129,19 +129,19 @@ export async function POST(request: Request) {
                    (body.meetingLink ? `Meeting Link: ${body.meetingLink}\n` : ''),
         location: body.type === 'video' ? (body.meetingLink || 'Online') : 'In-Person',
         url: body.meetingLink,
-        organizer: { name: 'TelehealthSol', email: 'noreply@telehealthsol.xyz' },
+        organizer: { name: 'epochTeleHealth', email: 'noreply@epochtelehealth.com' },
         status: 'CONFIRMED' as const,
         busyStatus: 'BUSY' as const,
         attendees: [
-          { 
-            name: body.patientName, 
+          {
+            name: body.patientName,
             email: body.recipientType === 'patient' ? body.to : '',
             rsvp: true,
             partstat: 'ACCEPTED' as const,
             role: 'REQ-PARTICIPANT' as const
           },
-          { 
-            name: `Dr. ${body.doctorName}`, 
+          {
+            name: `Dr. ${body.doctorName}`,
             email: body.recipientType === 'doctor' ? body.to : '',
             rsvp: true,
             partstat: 'ACCEPTED' as const,
@@ -149,10 +149,10 @@ export async function POST(request: Request) {
           },
         ],
         alarms: [
-          { 
-            action: 'display' as const, 
-            trigger: { minutes: 15, before: true }, 
-            description: 'Reminder' 
+          {
+            action: 'display' as const,
+            trigger: { minutes: 15, before: true },
+            description: 'Reminder'
           },
         ],
       };
@@ -162,18 +162,18 @@ export async function POST(request: Request) {
 
       if (error) {
         console.error('Error creating iCal event:', error);
-        return NextResponse.json({ 
-          success: true, 
+        return NextResponse.json({
+          success: true,
           message: 'Email sent successfully, but failed to create calendar invite',
-          error: error.message 
+          error: error.message
         });
       }
 
       console.log('iCal event created successfully');
-      return NextResponse.json({ 
-        success: true, 
+      return NextResponse.json({
+        success: true,
         message: 'Email and calendar invite sent successfully',
-        icsEvent 
+        icsEvent
       });
     } catch (error) {
       console.error('Error in send-calendar-invite:', error);

@@ -356,7 +356,7 @@ export default function DoctorDashboard() {
           <div className="flex items-center space-x-4">
             <Image
               src="/telehealthlogo.svg"
-              alt="teleHealthSol"
+              alt="epochTeleHealth logo"
               width={150}
               height={40}
               className="h-8 w-auto"
@@ -554,7 +554,9 @@ export default function DoctorDashboard() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Amount (USDC)</label>
+              <label className="block text-sm font-medium mb-1">
+                Amount (USDC)
+              </label>
               <Input
                 type="number"
                 min="0"
@@ -563,10 +565,14 @@ export default function DoctorDashboard() {
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground mt-1">Available: {walletBalance} USDC</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Available: {walletBalance} USDC
+              </p>
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Destination Address</label>
+              <label className="block text-sm font-medium mb-1">
+                Destination Address
+              </label>
               <Input
                 type="text"
                 placeholder="Recipient Solana address"
@@ -575,73 +581,117 @@ export default function DoctorDashboard() {
               />
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setWithdrawOpen(false)} disabled={withdrawing}>
+              <Button
+                variant="outline"
+                onClick={() => setWithdrawOpen(false)}
+                disabled={withdrawing}
+              >
                 Cancel
               </Button>
               <Button
                 onClick={async () => {
                   if (!doctorProfile?.email) {
-                    toast({ title: 'Missing email', description: 'Your account email is required to withdraw.', variant: 'destructive' });
+                    toast({
+                      title: "Missing email",
+                      description:
+                        "Your account email is required to withdraw.",
+                      variant: "destructive",
+                    });
                     return;
                   }
                   const amt = parseFloat(withdrawAmount);
                   if (!amt || amt <= 0) {
-                    toast({ title: 'Invalid amount', description: 'Enter a valid USDC amount.' , variant: 'destructive'});
+                    toast({
+                      title: "Invalid amount",
+                      description: "Enter a valid USDC amount.",
+                      variant: "destructive",
+                    });
                     return;
                   }
                   if (!withdrawAddress || withdrawAddress.length < 32) {
-                    toast({ title: 'Invalid address', description: 'Enter a valid Solana address.', variant: 'destructive' });
+                    toast({
+                      title: "Invalid address",
+                      description: "Enter a valid Solana address.",
+                      variant: "destructive",
+                    });
                     return;
                   }
                   setWithdrawing(true);
                   try {
                     // Initiate transfer from doctor (user-controlled)
-                    const res = await fetch('/api/payments/ucw-transfer', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
+                    const res = await fetch("/api/payments/ucw-transfer", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({
                         amount: String(amt),
                         destinationAddress: withdrawAddress,
                         email: doctorProfile.email,
-                        feeLevel: 'MEDIUM',
+                        feeLevel: "MEDIUM",
                       }),
                     });
                     const data = await res.json();
                     if (!res.ok) {
-                      throw new Error(data?.error || 'Failed to initiate withdrawal');
+                      throw new Error(
+                        data?.error || "Failed to initiate withdrawal"
+                      );
                     }
-                    const { challengeId, userToken, encryptionKey } = data as { challengeId: string; userToken: string; encryptionKey?: string };
+                    const { challengeId, userToken, encryptionKey } = data as {
+                      challengeId: string;
+                      userToken: string;
+                      encryptionKey?: string;
+                    };
                     if (!challengeId || !userToken) {
-                      throw new Error('Invalid withdrawal session');
+                      throw new Error("Invalid withdrawal session");
                     }
-                    toast({ title: 'Authorize Withdrawal', description: 'Confirm in the next prompt.' });
-                    web3Services.setAuthentication({ userToken, encryptionKey });
+                    toast({
+                      title: "Authorize Withdrawal",
+                      description: "Confirm in the next prompt.",
+                    });
+                    web3Services.setAuthentication({
+                      userToken,
+                      encryptionKey,
+                    });
                     await new Promise<void>((resolve, reject) => {
                       web3Services.execute(challengeId, (error) => {
                         if (error) {
                           const code = (error as any)?.code;
-                          const msg = (typeof error === 'object' && error && 'message' in (error as any)) ? (error as any).message as string : String(error);
+                          const msg =
+                            typeof error === "object" &&
+                            error &&
+                            "message" in (error as any)
+                              ? ((error as any).message as string)
+                              : String(error);
                           if (code === 155706) {
                             return; // wait for final callback
                           }
-                          reject(new Error(msg || 'Authorization failed'));
+                          reject(new Error(msg || "Authorization failed"));
                           return;
                         }
                         resolve();
                       });
                     });
-                    toast({ title: 'Withdrawal initiated', description: 'Funds are on the way.' });
+                    toast({
+                      title: "Withdrawal initiated",
+                      description: "Funds are on the way.",
+                    });
                     setWithdrawOpen(false);
                   } catch (err) {
-                    console.error('Withdraw error:', err);
-                    toast({ title: 'Withdrawal failed', description: err instanceof Error ? err.message : 'Please try again.', variant: 'destructive' });
+                    console.error("Withdraw error:", err);
+                    toast({
+                      title: "Withdrawal failed",
+                      description:
+                        err instanceof Error
+                          ? err.message
+                          : "Please try again.",
+                      variant: "destructive",
+                    });
                   } finally {
                     setWithdrawing(false);
                   }
                 }}
                 disabled={withdrawing}
               >
-                {withdrawing ? 'Processing...' : 'Withdraw'}
+                {withdrawing ? "Processing..." : "Withdraw"}
               </Button>
             </div>
           </div>
@@ -849,10 +899,14 @@ export default function DoctorDashboard() {
                                 : "default"
                             }
                             onClick={() => {
-                              if (appointment.type === 'text') {
-                                router.push(`/chat/doctor?appointmentId=${appointment.id}`);
+                              if (appointment.type === "text") {
+                                router.push(
+                                  `/chat/doctor?appointmentId=${appointment.id}`
+                                );
                               } else {
-                                router.push(`/video-call?appointmentId=${appointment.id}&role=doctor`);
+                                router.push(
+                                  `/video-call?appointmentId=${appointment.id}&role=doctor`
+                                );
                               }
                             }}
                           >

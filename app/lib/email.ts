@@ -40,8 +40,8 @@ export async function sendAppointmentConfirmation(
 
     // Prepare the email data according to Resend's API
     const emailData: EmailData = {
-      from: "Sabb | teleHealthSol <delivered@resend.dev>",
-      to: "telehealthsolng@gmail.com",
+      from: "Sabb | epochTeleHealth <delivered@resend.dev>",
+      to: "epochtelehealth@gmail.com",
       subject: `Appointment ${appointment.recipientType === "patient" ? "Confirmed" : "Scheduled"}: Dr. ${appointment.doctorName}`,
       react: emailComponent, // Pass the React component directly
     };

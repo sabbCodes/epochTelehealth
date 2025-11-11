@@ -331,7 +331,7 @@ export default function AccountTypeSelectionPage() {
             <Link href="/" className="inline-flex items-center space-x-2">
               <Image
                 src="/telehealthlogowithtext.svg"
-                alt="teleHealthSol"
+                alt="epochTeleHealth"
                 width={200}
                 height={50}
                 className="h-12 w-auto"
@@ -349,7 +349,7 @@ export default function AccountTypeSelectionPage() {
                 Choose Your Account Type
               </h1>
               <p className="text-gray-600 dark:text-gray-300">
-                Select how you&apos;ll be using teleHealthSol platform
+                Select how you&apos;ll be using epochTeleHealth platform
               </p>
               {email && (
                 <p className="text-sm text-blue-600 mt-2">

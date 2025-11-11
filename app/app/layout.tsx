@@ -13,7 +13,6 @@ export const metadata: Metadata = {
   title: "epochTeleHealth - Healthcare Without Borders",
   description:
     "Connect with world-class doctors from anywhere. Secure your medical records on blockchain.",
-  generator: "v0.dev",
 };
 
 export default function RootLayout({

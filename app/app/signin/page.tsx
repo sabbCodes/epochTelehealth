@@ -388,7 +388,7 @@ export default function SignInPage() {
             <Link href="/" className="inline-flex items-center space-x-2">
               <Image
                 src="/telehealthlogowithtext.svg"
-                alt="teleHealthSol"
+                alt="epochTeleHealth logo"
                 width={150}
                 height={40}
                 className="h-8 w-auto"

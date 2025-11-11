@@ -155,7 +155,7 @@ export default function AdminOnboardingPage() {
             <Link href="/" className="inline-flex items-center space-x-2">
               <Image
                 src="/telehealthlogowithtext.svg"
-                alt="teleHealthSol"
+                alt="epochTeleHealth logo"
                 width={200}
                 height={50}
                 className="h-12 w-auto"

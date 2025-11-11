@@ -196,8 +196,12 @@ export default function AdminDashboard() {
                 <Shield className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">Admin Dashboard</h1>
-                <p className="text-sm text-gray-600 dark:text-gray-300">teleHealthSol Platform Management</p>
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                  Admin Dashboard
+                </h1>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  epochTeleHealth Platform Management
+                </p>
               </div>
             </div>
 
@@ -223,16 +227,28 @@ export default function AdminDashboard() {
           className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
         >
           {stats.map((stat, index) => (
-            <motion.div key={index} whileHover={{ scale: 1.02 }} transition={{ type: "spring", stiffness: 300 }}>
+            <motion.div
+              key={index}
+              whileHover={{ scale: 1.02 }}
+              transition={{ type: "spring", stiffness: 300 }}
+            >
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{stat.title}</p>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{stat.value}</p>
-                      <p className="text-xs text-gray-500 mt-1">{stat.change}</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                        {stat.title}
+                      </p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                        {stat.value}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {stat.change}
+                      </p>
                     </div>
-                    <div className={`w-12 h-12 ${stat.bgColor} rounded-lg flex items-center justify-center`}>
+                    <div
+                      className={`w-12 h-12 ${stat.bgColor} rounded-lg flex items-center justify-center`}
+                    >
                       <stat.icon className={`w-6 h-6 ${stat.color}`} />
                     </div>
                   </div>
@@ -242,7 +258,11 @@ export default function AdminDashboard() {
           ))}
         </motion.div>
 
-        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6">
+        <Tabs
+          value={selectedTab}
+          onValueChange={setSelectedTab}
+          className="space-y-6"
+        >
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="verifications">Verifications</TabsTrigger>
@@ -268,15 +288,24 @@ export default function AdminDashboard() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     {recentActivity.map((activity) => (
-                      <div key={activity.id} className="flex items-start space-x-3">
+                      <div
+                        key={activity.id}
+                        className="flex items-start space-x-3"
+                      >
                         <div
                           className={`w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 dark:bg-gray-700`}
                         >
-                          <activity.icon className={`w-4 h-4 ${activity.color}`} />
+                          <activity.icon
+                            className={`w-4 h-4 ${activity.color}`}
+                          />
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm text-gray-900 dark:text-white">{activity.message}</p>
-                          <p className="text-xs text-gray-500">{activity.timestamp}</p>
+                          <p className="text-sm text-gray-900 dark:text-white">
+                            {activity.message}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {activity.timestamp}
+                          </p>
                         </div>
                       </div>
                     ))}
@@ -285,7 +314,11 @@ export default function AdminDashboard() {
               </motion.div>
 
               {/* System Alerts */}
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center">
@@ -295,10 +328,19 @@ export default function AdminDashboard() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     {systemAlerts.map((alert) => (
-                      <div key={alert.id} className={`p-3 border-l-4 rounded-r ${getAlertColor(alert.type)}`}>
+                      <div
+                        key={alert.id}
+                        className={`p-3 border-l-4 rounded-r ${getAlertColor(
+                          alert.type
+                        )}`}
+                      >
                         <h4 className="font-medium text-sm">{alert.title}</h4>
-                        <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">{alert.message}</p>
-                        <p className="text-xs text-gray-500 mt-1">{alert.timestamp}</p>
+                        <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                          {alert.message}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {alert.timestamp}
+                        </p>
                       </div>
                     ))}
                   </CardContent>
@@ -345,7 +387,9 @@ export default function AdminDashboard() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
                           <Avatar className="w-12 h-12">
-                            <AvatarImage src={verification.avatar || "/placeholder.svg"} />
+                            <AvatarImage
+                              src={verification.avatar || "/placeholder.svg"}
+                            />
                             <AvatarFallback>
                               {verification.name
                                 .split(" ")
@@ -354,20 +398,28 @@ export default function AdminDashboard() {
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <h3 className="font-semibold text-gray-900 dark:text-white">{verification.name}</h3>
+                            <h3 className="font-semibold text-gray-900 dark:text-white">
+                              {verification.name}
+                            </h3>
                             <p className="text-sm text-gray-600 dark:text-gray-300">
                               {verification.specialty} • {verification.country}
                             </p>
-                            <p className="text-xs text-gray-500">Submitted: {verification.submittedDate}</p>
+                            <p className="text-xs text-gray-500">
+                              Submitted: {verification.submittedDate}
+                            </p>
                           </div>
                         </div>
 
                         <div className="flex items-center space-x-3">
                           <div className="text-right">
-                            <Badge className={getStatusColor(verification.status)}>
+                            <Badge
+                              className={getStatusColor(verification.status)}
+                            >
                               {verification.status.replace("_", " ")}
                             </Badge>
-                            <p className="text-xs text-gray-500 mt-1">{verification.documents.length} documents</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {verification.documents.length} documents
+                            </p>
                           </div>
 
                           <div className="flex items-center space-x-2">
@@ -375,11 +427,18 @@ export default function AdminDashboard() {
                               <Eye className="w-4 h-4 mr-1" />
                               Review
                             </Button>
-                            <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                            <Button
+                              size="sm"
+                              className="bg-green-600 hover:bg-green-700"
+                            >
                               <CheckCircle className="w-4 h-4 mr-1" />
                               Approve
                             </Button>
-                            <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600 hover:text-red-700"
+                            >
                               <XCircle className="w-4 h-4 mr-1" />
                               Reject
                             </Button>
@@ -388,10 +447,16 @@ export default function AdminDashboard() {
                       </div>
 
                       <div className="mt-4">
-                        <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">Submitted Documents:</h4>
+                        <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                          Submitted Documents:
+                        </h4>
                         <div className="flex flex-wrap gap-2">
                           {verification.documents.map((doc, idx) => (
-                            <Badge key={idx} variant="outline" className="text-xs">
+                            <Badge
+                              key={idx}
+                              variant="outline"
+                              className="text-xs"
+                            >
                               {doc}
                             </Badge>
                           ))}
@@ -412,9 +477,12 @@ export default function AdminDashboard() {
               <CardContent>
                 <div className="text-center py-12">
                   <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">User Management</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                    User Management
+                  </h3>
                   <p className="text-gray-600 dark:text-gray-300">
-                    Comprehensive user management interface will be implemented here
+                    Comprehensive user management interface will be implemented
+                    here
                   </p>
                 </div>
               </CardContent>
@@ -432,20 +500,36 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Server Status</span>
-                    <Badge className="bg-green-100 text-green-800">Online</Badge>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">
+                      Server Status
+                    </span>
+                    <Badge className="bg-green-100 text-green-800">
+                      Online
+                    </Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Database</span>
-                    <Badge className="bg-green-100 text-green-800">Connected</Badge>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">
+                      Database
+                    </span>
+                    <Badge className="bg-green-100 text-green-800">
+                      Connected
+                    </Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Blockchain</span>
-                    <Badge className="bg-green-100 text-green-800">Synced</Badge>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">
+                      Blockchain
+                    </span>
+                    <Badge className="bg-green-100 text-green-800">
+                      Synced
+                    </Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-300">IPFS</span>
-                    <Badge className="bg-green-100 text-green-800">Active</Badge>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">
+                      IPFS
+                    </span>
+                    <Badge className="bg-green-100 text-green-800">
+                      Active
+                    </Badge>
                   </div>
                 </CardContent>
               </Card>
@@ -459,19 +543,27 @@ export default function AdminDashboard() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Response Time</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">
+                      Response Time
+                    </span>
                     <span className="text-sm font-medium">&lt; 200ms</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Uptime</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">
+                      Uptime
+                    </span>
                     <span className="text-sm font-medium">99.9%</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Active Users</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">
+                      Active Users
+                    </span>
                     <span className="text-sm font-medium">1,247</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600 dark:text-gray-300">Transactions/Hour</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-300">
+                      Transactions/Hour
+                    </span>
                     <span className="text-sm font-medium">156</span>
                   </div>
                 </CardContent>
@@ -481,5 +573,5 @@ export default function AdminDashboard() {
         </Tabs>
       </div>
     </div>
-  )
+  );
 }

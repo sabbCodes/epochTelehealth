@@ -1,4 +1,4 @@
--- Create users table for teleHealthSol
+-- Create users table for epochTeleHealth
 CREATE TABLE IF NOT EXISTS users (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,

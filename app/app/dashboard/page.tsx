@@ -363,7 +363,7 @@ export default function Dashboard() {
           <div className="flex items-center space-x-4">
             <Image
               src="/telehealthlogo.svg"
-              alt="teleHealthSol"
+              alt="epochTeleHealth logo"
               width={150}
               height={40}
               className="h-8 w-auto"
@@ -429,7 +429,12 @@ export default function Dashboard() {
                   </Avatar>
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-medium leading-none">
-                      {userProfile?.first_name ? formatName(userProfile.first_name) : ''} {userProfile?.last_name ? formatName(userProfile.last_name) : ''}
+                      {userProfile?.first_name
+                        ? formatName(userProfile.first_name)
+                        : ""}{" "}
+                      {userProfile?.last_name
+                        ? formatName(userProfile.last_name)
+                        : ""}
                     </p>
                     <p className="text-xs leading-none text-muted-foreground">
                       {userProfile?.email}

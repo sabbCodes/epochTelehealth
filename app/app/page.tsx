@@ -139,7 +139,7 @@ export default function LandingPage() {
       name: "Dr. Adaora Okafor",
       role: "Cardiologist, Lagos",
       content:
-        "teleHealthSol has revolutionized how I connect with patients across Nigeria. The blockchain security gives both me and my patients peace of mind.",
+        "epochTeleHealth has revolutionized how I connect with patients across Nigeria. The blockchain security gives both me and my patients peace of mind.",
       avatar: getDiceBearAvatar("adaora"),
       rating: 5,
     },
@@ -175,7 +175,7 @@ export default function LandingPage() {
               <Link href="/" className="flex items-center space-x-2">
                 <Image
                   src="/telehealthlogowithtext.svg"
-                  alt="teleHealthSol"
+                  alt="epochTeleHealth logo"
                   width={150}
                   height={40}
                   className="h-8 w-auto"
@@ -387,7 +387,7 @@ export default function LandingPage() {
               How It Works
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Get started with teleHealthSol in four simple steps and experience
+              Get started with epochTeleHealth in four simple steps and experience
               the future of healthcare
             </p>
           </motion.div>
@@ -687,7 +687,7 @@ export default function LandingPage() {
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
               Hear from doctors and patients who are transforming healthcare
-              with teleHealthSol
+              with epochTeleHealth
             </p>
           </motion.div>
 
@@ -762,7 +762,7 @@ export default function LandingPage() {
             className="text-center mb-16"
           >
             <h2 className="text-4xl font-bold text-gray-900 dark:text-white mb-4 font-heading">
-              About teleHealthSol
+              About epochTeleHealth
             </h2>
             <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
               Revolutionizing healthcare access in developing nations through
@@ -923,7 +923,7 @@ export default function LandingPage() {
               <div className="flex items-center space-x-2 mb-4">
                 <Image
                   src="/telehealthlogowithtext.svg"
-                  alt="teleHealthSol"
+                  alt="epochTeleHealth logo"
                   width={150}
                   height={40}
                   className="h-8 w-auto"
@@ -935,7 +935,7 @@ export default function LandingPage() {
               </p>
               <div className="flex space-x-4">
                 <a
-                  href="https://x.com/teleHealthS0l"
+                  href="https://x.com/epochTeleHealth"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-10 h-10 bg-gray-800 rounded-lg flex items-center justify-center hover:bg-gray-700 transition-colors"
@@ -1015,7 +1015,7 @@ export default function LandingPage() {
           <div className="border-t border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center">
             <div className="flex flex-col space-y-2">
               <p className="text-gray-400 text-sm">
-                © {currentYear} teleHealthSol. All rights reserved.
+                © {currentYear} epochTeleHealth. All rights reserved.
               </p>
               <p className="text-gray-500 text-xs">
                 Illustrations by{" "}
