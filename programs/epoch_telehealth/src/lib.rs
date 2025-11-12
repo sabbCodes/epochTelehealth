@@ -23,7 +23,7 @@ pub mod epoch_telehealth {
         patient_id: [u8; 32],
         doctor_id: [u8; 32],
         consultation_date: [u8; 32],
-        diagnosis: [u8; 32],
+        diagnosis: [[u8; 32]; 3],
         symptoms: [[u8; 32]; 5],
         treatment_plan: [u8; 32],
         medications: [[u8; 32]; 5],
@@ -67,9 +67,13 @@ pub mod epoch_telehealth {
             Argument::PlaintextU128(nonce),
             Argument::EncryptedU128(hr.patient_id),
             Argument::EncryptedU128(hr.doctor_id),
-            Argument::EncryptedU64(hr.consultation_date),
-            Argument::EncryptedU64(hr.diagnosis),
+            Argument::EncryptedU128(hr.consultation_date),
         ];
+
+        // Add all diagnosis texts
+        for diagnosis in &hr.diagnosis {
+            args.push(Argument::EncryptedU64(*diagnosis));
+        }
 
         // Add all 5 symptoms
         for symptom in &hr.symptoms {
@@ -111,21 +115,24 @@ pub mod epoch_telehealth {
         let patient_id = o.ciphertexts[0];
         let doctor_id = o.ciphertexts[1];
         let consultation_date = o.ciphertexts[2];
-        let diagnosis = o.ciphertexts[3];
+        let mut diagnosis = [[0u8; 32]; 3];
+        for i in 0..3 {
+            diagnosis[i] = o.ciphertexts[3 + i]
+        }
 
         let mut symptoms = [[0u8; 32]; 5];
         for i in 0..5 {
-            symptoms[i] = o.ciphertexts[4 + i];
+            symptoms[i] = o.ciphertexts[6 + i];
         }
 
-        let treatment_plan = o.ciphertexts[9];
+        let treatment_plan = o.ciphertexts[11];
 
         let mut medications = [[0u8; 32]; 5];
         for i in 0..5 {
-            medications[i] = o.ciphertexts[10 + i];
+            medications[i] = o.ciphertexts[12 + i];
         }
 
-        let notes = o.ciphertexts[15];
+        let notes = o.ciphertexts[17];
 
         emit!(ReceivedHealthRecordEvent {
             nonce: o.nonce.to_le_bytes(),
@@ -266,7 +273,7 @@ pub struct ReceivedHealthRecordEvent {
     pub patient_id: [u8; 32],
     pub doctor_id: [u8; 32],
     pub consultation_date: [u8; 32],
-    pub diagnosis: [u8; 32],
+    pub diagnosis: [[u8; 32]; 3],
     pub symptoms: [[u8; 32]; 5],
     pub treatment_plan: [u8; 32],
     pub medications: [[u8; 32]; 5],
@@ -279,7 +286,7 @@ pub struct HealthRecord {
     pub patient_id: [u8; 32],
     pub doctor_id: [u8; 32],
     pub consultation_date: [u8; 32],
-    pub diagnosis: [u8; 32],
+    pub diagnosis: [[u8; 32]; 3],
     pub symptoms: [[u8; 32]; 5],
     pub treatment_plan: [u8; 32],
     pub medications: [[u8; 32]; 5],

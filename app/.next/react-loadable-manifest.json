@@ -1,4 +1,8 @@
 {
+  "app/signin/page.tsx -> @/lib/supabase": {
+    "id": "app/signin/page.tsx -> @/lib/supabase",
+    "files": []
+  },
   "node_modules/@particle-network/auth/es/index.js -> draggabilly": {
     "id": "node_modules/@particle-network/auth/es/index.js -> draggabilly",
     "files": []
@@ -371,6 +375,22 @@
   },
   "node_modules/@solana/wallet-adapter-trezor/lib/esm/adapter.js -> @trezor/connect-web": {
     "id": "node_modules/@solana/wallet-adapter-trezor/lib/esm/adapter.js -> @trezor/connect-web",
+    "files": []
+  },
+  "node_modules/@supabase/auth-js/dist/module/lib/helpers.js -> @supabase/node-fetch": {
+    "id": "node_modules/@supabase/auth-js/dist/module/lib/helpers.js -> @supabase/node-fetch",
+    "files": []
+  },
+  "node_modules/@supabase/functions-js/dist/module/helper.js -> @supabase/node-fetch": {
+    "id": "node_modules/@supabase/functions-js/dist/module/helper.js -> @supabase/node-fetch",
+    "files": []
+  },
+  "node_modules/@supabase/realtime-js/dist/module/RealtimeClient.js -> @supabase/node-fetch": {
+    "id": "node_modules/@supabase/realtime-js/dist/module/RealtimeClient.js -> @supabase/node-fetch",
+    "files": []
+  },
+  "node_modules/@supabase/storage-js/dist/module/lib/helpers.js -> @supabase/node-fetch": {
+    "id": "node_modules/@supabase/storage-js/dist/module/lib/helpers.js -> @supabase/node-fetch",
     "files": []
   },
   "node_modules/@walletconnect/utils/node_modules/viem/_esm/actions/public/call.js -> ../../utils/ccip.js": {

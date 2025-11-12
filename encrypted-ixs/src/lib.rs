@@ -8,11 +8,11 @@ mod circuits {
         pub patient_id: u128,
         pub doctor_id: u128,
         pub consultation_date: u64,
-        pub diagnosis: u64,
+        pub diagnosis: [u64; 3],
         pub symptoms: [u64; 5],
-        pub treatment_plan: u64,
+        pub treatment_plan: u128,
         pub medications: [u64; 5],
-        pub notes: u64,
+        pub notes: u128,
     }
 
     #[instruction]

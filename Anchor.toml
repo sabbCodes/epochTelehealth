@@ -44,44 +44,44 @@ address = "C9ajjZQsXwMzNgifWaNfGzmVv4agp8x8hEqFpkCCUu6S"
 filename = "artifacts/arx_ata_Sabb_hVxj.json"
 
 [[test.validator.account]]
-address = "757tMRxPdhU1RL9RkwoCDBpWbfCdR4RTr8sJTpP4ns2P"
-filename = "artifacts/wallet_acc_757t_ns2P.json"
+address = "FJywdFKB2ns6ivasbKV4eds5HY4oVacVvvCkC6exr84i"
+filename = "artifacts/wallet_acc_FJyw_r84i.json"
 
 [[test.validator.account]]
-address = "79bk9gNnGdVizAvk7waWsby2JesKKLG7ow6bxvmSZ7tB"
-filename = "artifacts/wallet_acc_callback_79bk_Z7tB.json"
+address = "5XbYmnxeaYSBLcVFWKZW6v8heAKLGhYcu6P2fWeuYep9"
+filename = "artifacts/wallet_acc_callback_5XbY_Yep9.json"
 
 [[test.validator.account]]
-address = "BefUpHoNKESDLac87SfgmsMzn6nRnQ4eUH6HN2nTK9Fu"
-filename = "artifacts/arx_ata_757t_ns2P.json"
+address = "6aNYXLerLHD42JESmX8QqvSejyAQQzP4kMQA2qc9ahna"
+filename = "artifacts/arx_ata_FJyw_r84i.json"
 
 [[test.validator.account]]
-address = "DUw62ywJcMMzR6626YfCT5gE49sw5iipSAFLQvzqfuGM"
-filename = "artifacts/operator_acc_757t_ns2P.json"
+address = "GLUR4Agm1GGMp4eChcumWD6dSaorBnUbm3R3EtZx5jzm"
+filename = "artifacts/operator_acc_FJyw_r84i.json"
 
 [[test.validator.account]]
 address = "ELoRR19zrps1G3UYKcAxr7LKbw3kbqkVUXVY9dETMWN7"
-filename = "artifacts/arx_node_757t_ns2P.json"
+filename = "artifacts/arx_node_FJyw_r84i.json"
 
 [[test.validator.account]]
-address = "GMtsGVLQiuZirhgKdC7Wqjg2txFkMbjeyrzsgrPbAePA"
-filename = "artifacts/wallet_acc_GMts_AePA.json"
+address = "Gs3WPmE4m1Jq5ATvxMcker6hXBhW4PiLGUKVcvjdNEV1"
+filename = "artifacts/wallet_acc_Gs3W_NEV1.json"
 
 [[test.validator.account]]
-address = "GhwiQnLHs3BZDX8pcxPZbUsLZYdVRwATYwJbAPMkKv6j"
-filename = "artifacts/wallet_acc_callback_Ghwi_Kv6j.json"
+address = "C44Vc1PfRhNMBnrKFrrYBnaygrUmHHBWytejvRus7TqH"
+filename = "artifacts/wallet_acc_callback_C44V_7TqH.json"
 
 [[test.validator.account]]
-address = "8nhpzeDdHiPYNRjb3Ec7TEvgQGGRgVSnWN28DfMW3rru"
-filename = "artifacts/arx_ata_GMts_AePA.json"
+address = "68qQeMX7riBXJCbTHBkNt53QXdJftQjDebxwivmZadwx"
+filename = "artifacts/arx_ata_Gs3W_NEV1.json"
 
 [[test.validator.account]]
-address = "22J2oRvcM7RmEfgMsQszmceokDoHGa7jhMMdLSUjnxpH"
-filename = "artifacts/operator_acc_GMts_AePA.json"
+address = "6DT97isaL5K8mWcUgHP5Sbz5JdkqKq3uuUxQjUvQLehi"
+filename = "artifacts/operator_acc_Gs3W_NEV1.json"
 
 [[test.validator.account]]
 address = "XdfSwb8ZajhN7CerfBSJVhyfx5fyLtv34QVKSRgMFA9"
-filename = "artifacts/arx_node_GMts_AePA.json"
+filename = "artifacts/arx_node_Gs3W_NEV1.json"
 
 [[test.validator.account]]
 address = "GgSqqAyH7AVY3Umcv8NvncrjFaNJuQLmxzxFxPoPW2Yd"
