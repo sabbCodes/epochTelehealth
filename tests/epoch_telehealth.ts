@@ -418,11 +418,12 @@ describe("EpochTelehealth", () => {
     );
     const decryptedMedications = joinFieldsIntoText(decryptedMedicationFields);
 
-    const decryptedNotes = u64ArrayToString([decryptedFields[17]]);
+    const decryptedNotes = u128ToString(decryptedFields[17]);
 
-    console.log("Reconstructed values:", {
+    console.log("Fetched record:", {
       patientId: decryptedPatientId,
       doctorId: decryptedDoctorId,
+      consultationDate: decryptedFields[2].toString(),
       diagnosis: decryptedDiagnosis,
       symptoms: decryptedSymptoms,
       treatmentPlan: decryptedTreatmentPlan,
