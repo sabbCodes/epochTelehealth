@@ -3,7 +3,6 @@
 @tailwind utilities;
 
 @import '@solana/wallet-adapter-react-ui/styles.css';
-@import '../styles/wallet.css';
 
 @layer base {
   :root {

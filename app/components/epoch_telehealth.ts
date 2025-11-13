@@ -5,64 +5,80 @@
  * IDL can be found at `target/idl/epoch_telehealth.json`.
  */
 export type EpochTelehealth = {
-  address: "B1mNWS9JxnwBhehnrAYQCYVddr7pSf7Atv9pH9ntikfz";
-  metadata: {
-    name: "epochTelehealth";
-    version: "0.1.0";
-    spec: "0.1.0";
-    description: "Created with Arcium & Anchor";
-  };
-  instructions: [
+  "address": "2MaYTbWLqs8nqLNPPrTz4KXkbhMt4hQKQaM3LVFQNnPG",
+  "metadata": {
+    "name": "epochTelehealth",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Arcium & Anchor"
+  },
+  "instructions": [
     {
-      name: "initShareRecordCompDef";
-      docs: [
-        "Initialize the computation definition for sharing medical records"
-      ];
-      discriminator: [192, 6, 110, 39, 57, 221, 78, 61];
-      accounts: [
+      "name": "initShareHealthRecordCompDef",
+      "discriminator": [
+        254,
+        118,
+        155,
+        96,
+        86,
+        25,
+        203,
+        128
+      ],
+      "accounts": [
         {
-          name: "payer";
-          writable: true;
-          signer: true;
+          "name": "payer",
+          "writable": true,
+          "signer": true
         },
         {
-          name: "mxeAccount";
-          writable: true;
+          "name": "mxeAccount",
+          "writable": true
         },
         {
-          name: "compDefAccount";
-          docs: ["Can't check it here as it's not initialized yet."];
-          writable: true;
+          "name": "compDefAccount",
+          "writable": true
         },
         {
-          name: "arciumProgram";
-          address: "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6";
+          "name": "arciumProgram",
+          "address": "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6"
         },
         {
-          name: "systemProgram";
-          address: "11111111111111111111111111111111";
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
         }
-      ];
-      args: [];
+      ],
+      "args": []
     },
     {
-      name: "shareMedicalRecord";
-      docs: ["Share medical record with authorized healthcare provider"];
-      discriminator: [31, 21, 151, 248, 98, 119, 108, 168];
-      accounts: [
+      "name": "shareHealthRecord",
+      "docs": [
+        "Shares health record confidentially"
+      ],
+      "discriminator": [
+        48,
+        169,
+        80,
+        6,
+        84,
+        83,
+        197,
+        159
+      ],
+      "accounts": [
         {
-          name: "payer";
-          writable: true;
-          signer: true;
+          "name": "payer",
+          "writable": true,
+          "signer": true
         },
         {
-          name: "signPdaAccount";
-          writable: true;
-          pda: {
-            seeds: [
+          "name": "signPdaAccount",
+          "writable": true,
+          "pda": {
+            "seeds": [
               {
-                kind: "const";
-                value: [
+                "kind": "const",
+                "value": [
                   83,
                   105,
                   103,
@@ -76,152 +92,172 @@ export type EpochTelehealth = {
                   117,
                   110,
                   116
-                ];
+                ]
               }
-            ];
-          };
+            ]
+          }
         },
         {
-          name: "mxeAccount";
+          "name": "mxeAccount"
         },
         {
-          name: "mempoolAccount";
-          writable: true;
+          "name": "mempoolAccount",
+          "writable": true
         },
         {
-          name: "executingPool";
-          writable: true;
+          "name": "executingPool",
+          "writable": true
         },
         {
-          name: "computationAccount";
-          writable: true;
+          "name": "computationAccount",
+          "writable": true
         },
         {
-          name: "compDefAccount";
+          "name": "compDefAccount"
         },
         {
-          name: "clusterAccount";
-          writable: true;
+          "name": "clusterAccount",
+          "writable": true
         },
         {
-          name: "poolAccount";
-          writable: true;
-          address: "7MGSS4iKNM4sVib7bDZDJhVqB6EcchPwVnTKenCY1jt3";
+          "name": "poolAccount",
+          "writable": true,
+          "address": "7MGSS4iKNM4sVib7bDZDJhVqB6EcchPwVnTKenCY1jt3"
         },
         {
-          name: "clockAccount";
-          address: "FHriyvoZotYiFnbUzKFjzRSb2NiaC8RPWY7jtKuKhg65";
+          "name": "clockAccount",
+          "address": "FHriyvoZotYiFnbUzKFjzRSb2NiaC8RPWY7jtKuKhg65"
         },
         {
-          name: "systemProgram";
-          address: "11111111111111111111111111111111";
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
         },
         {
-          name: "arciumProgram";
-          address: "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6";
+          "name": "arciumProgram",
+          "address": "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6"
         },
         {
-          name: "medicalRecord";
+          "name": "healthRecord"
         }
-      ];
-      args: [
+      ],
+      "args": [
         {
-          name: "computationOffset";
-          type: "u64";
+          "name": "computationOffset",
+          "type": "u64"
         },
         {
-          name: "receiver";
-          type: {
-            array: ["u8", 32];
-          };
+          "name": "receiver",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         },
         {
-          name: "receiverNonce";
-          type: "u128";
+          "name": "receiverNonce",
+          "type": "u128"
         },
         {
-          name: "senderPubKey";
-          type: {
-            array: ["u8", 32];
-          };
+          "name": "senderPubKey",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         },
         {
-          name: "nonce";
-          type: "u128";
+          "name": "nonce",
+          "type": "u128"
         }
-      ];
+      ]
     },
     {
-      name: "shareMedicalRecordCallback";
-      discriminator: [150, 228, 39, 104, 57, 40, 192, 55];
-      accounts: [
+      "name": "shareHealthRecordCallback",
+      "discriminator": [
+        47,
+        203,
+        229,
+        29,
+        220,
+        1,
+        255,
+        114
+      ],
+      "accounts": [
         {
-          name: "arciumProgram";
-          address: "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6";
+          "name": "arciumProgram",
+          "address": "BKck65TgoKRokMjQM3datB9oRwJ8rAj2jxPXvHXUvcL6"
         },
         {
-          name: "compDefAccount";
+          "name": "compDefAccount"
         },
         {
-          name: "instructionsSysvar";
-          address: "Sysvar1nstructions1111111111111111111111111";
+          "name": "instructionsSysvar",
+          "address": "Sysvar1nstructions1111111111111111111111111"
         }
-      ];
-      args: [
+      ],
+      "args": [
         {
-          name: "output";
-          type: {
-            defined: {
-              name: "computationOutputs";
-              generics: [
+          "name": "output",
+          "type": {
+            "defined": {
+              "name": "computationOutputs",
+              "generics": [
                 {
-                  kind: "type";
-                  type: {
-                    defined: {
-                      name: "shareMedicalRecordOutput";
-                    };
-                  };
+                  "kind": "type",
+                  "type": {
+                    "defined": {
+                      "name": "shareHealthRecordOutput"
+                    }
+                  }
                 }
-              ];
-            };
-          };
+              ]
+            }
+          }
         }
-      ];
+      ]
     },
     {
-      name: "storeMedicalRecord";
-      docs: [
-        "Stores encrypted medical record data on-chain.",
-        "",
-        "All data fields are provided as encrypted 32-byte arrays that can only be",
-        "decrypted by authorized parties (patient and authorized healthcare providers)."
-      ];
-      discriminator: [102, 93, 85, 80, 227, 161, 246, 171];
-      accounts: [
+      "name": "storeHealthRecord",
+      "docs": [
+        "Stores encrypted health record on-chain"
+      ],
+      "discriminator": [
+        25,
+        213,
+        122,
+        186,
+        165,
+        208,
+        212,
+        11
+      ],
+      "accounts": [
         {
-          name: "payer";
-          writable: true;
-          signer: true;
+          "name": "doctor",
+          "writable": true,
+          "signer": true
         },
         {
-          name: "systemProgram";
-          address: "11111111111111111111111111111111";
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
         },
         {
-          name: "medicalRecord";
-          writable: true;
-          pda: {
-            seeds: [
+          "name": "healthRecord",
+          "writable": true,
+          "pda": {
+            "seeds": [
               {
-                kind: "const";
-                value: [
-                  109,
+                "kind": "const",
+                "value": [
+                  104,
                   101,
-                  100,
-                  105,
-                  99,
                   97,
                   108,
+                  116,
+                  104,
                   95,
                   114,
                   101,
@@ -229,888 +265,1142 @@ export type EpochTelehealth = {
                   111,
                   114,
                   100
-                ];
+                ]
               },
               {
-                kind: "account";
-                path: "payer";
+                "kind": "account",
+                "path": "doctor"
+              },
+              {
+                "kind": "arg",
+                "path": "recordId"
               }
-            ];
-          };
+            ]
+          }
         }
-      ];
-      args: [
+      ],
+      "args": [
         {
-          name: "patientId";
-          type: {
-            array: ["u8", 32];
-          };
+          "name": "recordId",
+          "type": "u64"
         },
         {
-          name: "doctorId";
-          type: {
-            array: ["u8", 32];
-          };
+          "name": "patientId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         },
         {
-          name: "consultationDate";
-          type: {
-            array: ["u8", 32];
-          };
+          "name": "doctorId",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         },
         {
-          name: "diagnosis";
-          type: {
-            array: ["u8", 32];
-          };
+          "name": "consultationDate",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         },
         {
-          name: "symptoms";
-          type: {
-            array: ["u8", 32];
-          };
+          "name": "diagnosis",
+          "type": {
+            "array": [
+              {
+                "array": [
+                  "u8",
+                  32
+                ]
+              },
+              3
+            ]
+          }
         },
         {
-          name: "treatmentPlan";
-          type: {
-            array: ["u8", 32];
-          };
+          "name": "symptoms",
+          "type": {
+            "array": [
+              {
+                "array": [
+                  "u8",
+                  32
+                ]
+              },
+              5
+            ]
+          }
         },
         {
-          name: "medications";
-          type: {
-            array: ["u8", 32];
-          };
+          "name": "treatmentPlan",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         },
         {
-          name: "notes";
-          type: {
-            array: ["u8", 32];
-          };
+          "name": "medications",
+          "type": {
+            "array": [
+              {
+                "array": [
+                  "u8",
+                  32
+                ]
+              },
+              5
+            ]
+          }
+        },
+        {
+          "name": "notes",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         }
-      ];
+      ]
     }
-  ];
-  accounts: [
+  ],
+  "accounts": [
     {
-      name: "clockAccount";
-      discriminator: [152, 171, 158, 195, 75, 61, 51, 8];
+      "name": "clockAccount",
+      "discriminator": [
+        152,
+        171,
+        158,
+        195,
+        75,
+        61,
+        51,
+        8
+      ]
     },
     {
-      name: "cluster";
-      discriminator: [236, 225, 118, 228, 173, 106, 18, 60];
+      "name": "cluster",
+      "discriminator": [
+        236,
+        225,
+        118,
+        228,
+        173,
+        106,
+        18,
+        60
+      ]
     },
     {
-      name: "computationDefinitionAccount";
-      discriminator: [245, 176, 217, 221, 253, 104, 172, 200];
+      "name": "computationDefinitionAccount",
+      "discriminator": [
+        245,
+        176,
+        217,
+        221,
+        253,
+        104,
+        172,
+        200
+      ]
     },
     {
-      name: "feePool";
-      discriminator: [172, 38, 77, 146, 148, 5, 51, 242];
+      "name": "feePool",
+      "discriminator": [
+        172,
+        38,
+        77,
+        146,
+        148,
+        5,
+        51,
+        242
+      ]
     },
     {
-      name: "mxeAccount";
-      discriminator: [103, 26, 85, 250, 179, 159, 17, 117];
+      "name": "healthRecord",
+      "discriminator": [
+        75,
+        125,
+        187,
+        175,
+        128,
+        179,
+        45,
+        90
+      ]
     },
     {
-      name: "medicalRecord";
-      discriminator: [30, 152, 224, 245, 112, 161, 115, 55];
+      "name": "mxeAccount",
+      "discriminator": [
+        103,
+        26,
+        85,
+        250,
+        179,
+        159,
+        17,
+        117
+      ]
     },
     {
-      name: "signerAccount";
-      discriminator: [127, 212, 7, 180, 17, 50, 249, 193];
+      "name": "signerAccount",
+      "discriminator": [
+        127,
+        212,
+        7,
+        180,
+        17,
+        50,
+        249,
+        193
+      ]
     }
-  ];
-  events: [
+  ],
+  "events": [
     {
-      name: "receivedMedicalRecordEvent";
-      discriminator: [48, 15, 166, 233, 24, 141, 92, 126];
-    }
-  ];
-  errors: [
-    {
-      code: 6000;
-      name: "invalidFinalizeTx";
-      msg: "Invalid finalize transaction";
+      "name": "healthRecordStoredEvent",
+      "discriminator": [
+        250,
+        255,
+        239,
+        13,
+        89,
+        104,
+        159,
+        39
+      ]
     },
     {
-      code: 6001;
-      name: "invalidAccount";
-      msg: "Invalid account";
+      "name": "receivedHealthRecordEvent",
+      "discriminator": [
+        229,
+        171,
+        231,
+        48,
+        92,
+        31,
+        226,
+        11
+      ]
     }
-  ];
-  types: [
+  ],
+  "errors": [
     {
-      name: "activation";
-      type: {
-        kind: "struct";
-        fields: [
+      "code": 6000,
+      "name": "invalidFinalizeTx",
+      "msg": "Invalid finalize transaction"
+    },
+    {
+      "code": 6001,
+      "name": "invalidAccount",
+      "msg": "Invalid account"
+    }
+  ],
+  "types": [
+    {
+      "name": "activation",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "activationEpoch";
-            type: {
-              defined: {
-                name: "epoch";
-              };
-            };
-          },
-          {
-            name: "deactivationEpoch";
-            type: {
-              defined: {
-                name: "epoch";
-              };
-            };
-          }
-        ];
-      };
-    },
-    {
-      name: "circuitSource";
-      type: {
-        kind: "enum";
-        variants: [
-          {
-            name: "local";
-            fields: [
-              {
-                defined: {
-                  name: "localCircuitSource";
-                };
+            "name": "activationEpoch",
+            "type": {
+              "defined": {
+                "name": "epoch"
               }
-            ];
+            }
           },
           {
-            name: "onChain";
-            fields: [
-              {
-                defined: {
-                  name: "onChainCircuitSource";
-                };
+            "name": "deactivationEpoch",
+            "type": {
+              "defined": {
+                "name": "epoch"
               }
-            ];
-          },
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "circuitSource",
+      "type": {
+        "kind": "enum",
+        "variants": [
           {
-            name: "offChain";
-            fields: [
+            "name": "local",
+            "fields": [
               {
-                defined: {
-                  name: "offChainCircuitSource";
-                };
+                "defined": {
+                  "name": "localCircuitSource"
+                }
               }
-            ];
+            ]
+          },
+          {
+            "name": "onChain",
+            "fields": [
+              {
+                "defined": {
+                  "name": "onChainCircuitSource"
+                }
+              }
+            ]
+          },
+          {
+            "name": "offChain",
+            "fields": [
+              {
+                "defined": {
+                  "name": "offChainCircuitSource"
+                }
+              }
+            ]
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "clockAccount";
-      docs: ["An account storing the current network epoch"];
-      type: {
-        kind: "struct";
-        fields: [
+      "name": "clockAccount",
+      "docs": [
+        "An account storing the current network epoch"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "startEpoch";
-            type: {
-              defined: {
-                name: "epoch";
-              };
-            };
+            "name": "startEpoch",
+            "type": {
+              "defined": {
+                "name": "epoch"
+              }
+            }
           },
           {
-            name: "currentEpoch";
-            type: {
-              defined: {
-                name: "epoch";
-              };
-            };
+            "name": "currentEpoch",
+            "type": {
+              "defined": {
+                "name": "epoch"
+              }
+            }
           },
           {
-            name: "startEpochTimestamp";
-            type: {
-              defined: {
-                name: "timestamp";
-              };
-            };
+            "name": "startEpochTimestamp",
+            "type": {
+              "defined": {
+                "name": "timestamp"
+              }
+            }
           },
           {
-            name: "bump";
-            type: "u8";
+            "name": "bump",
+            "type": "u8"
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "cluster";
-      type: {
-        kind: "struct";
-        fields: [
+      "name": "cluster",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "authority";
-            type: {
-              option: "pubkey";
-            };
+            "name": "authority",
+            "type": {
+              "option": "pubkey"
+            }
           },
           {
-            name: "maxSize";
-            type: "u32";
+            "name": "maxSize",
+            "type": "u32"
           },
           {
-            name: "activation";
-            type: {
-              defined: {
-                name: "activation";
-              };
-            };
+            "name": "activation",
+            "type": {
+              "defined": {
+                "name": "activation"
+              }
+            }
           },
           {
-            name: "maxCapacity";
-            type: "u64";
+            "name": "maxCapacity",
+            "type": "u64"
           },
           {
-            name: "cuPrice";
-            type: "u64";
+            "name": "cuPrice",
+            "type": "u64"
           },
           {
-            name: "cuPriceProposals";
-            type: {
-              array: ["u64", 32];
-            };
+            "name": "cuPriceProposals",
+            "type": {
+              "array": [
+                "u64",
+                32
+              ]
+            }
           },
           {
-            name: "lastUpdatedEpoch";
-            type: {
-              defined: {
-                name: "epoch";
-              };
-            };
+            "name": "lastUpdatedEpoch",
+            "type": {
+              "defined": {
+                "name": "epoch"
+              }
+            }
           },
           {
-            name: "mxes";
-            type: {
-              vec: "pubkey";
-            };
+            "name": "mxes",
+            "type": {
+              "vec": "pubkey"
+            }
           },
           {
-            name: "nodes";
-            type: {
-              vec: {
-                defined: {
-                  name: "nodeRef";
-                };
-              };
-            };
+            "name": "nodes",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "nodeRef"
+                }
+              }
+            }
           },
           {
-            name: "pendingNodes";
-            type: {
-              vec: {
-                defined: {
-                  name: "nodeRef";
-                };
-              };
-            };
+            "name": "pendingNodes",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "nodeRef"
+                }
+              }
+            }
           },
           {
-            name: "bump";
-            type: "u8";
+            "name": "bump",
+            "type": "u8"
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "computationDefinitionAccount";
-      docs: ["An account representing a [ComputationDefinition] in a MXE."];
-      type: {
-        kind: "struct";
-        fields: [
+      "name": "computationDefinitionAccount",
+      "docs": [
+        "An account representing a [ComputationDefinition] in a MXE."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "finalizationAuthority";
-            type: {
-              option: "pubkey";
-            };
+            "name": "finalizationAuthority",
+            "type": {
+              "option": "pubkey"
+            }
           },
           {
-            name: "finalizeDuringCallback";
-            type: "bool";
+            "name": "finalizeDuringCallback",
+            "type": "bool"
           },
           {
-            name: "cuAmount";
-            type: "u64";
+            "name": "cuAmount",
+            "type": "u64"
           },
           {
-            name: "definition";
-            type: {
-              defined: {
-                name: "computationDefinitionMeta";
-              };
-            };
+            "name": "definition",
+            "type": {
+              "defined": {
+                "name": "computationDefinitionMeta"
+              }
+            }
           },
           {
-            name: "circuitSource";
-            type: {
-              defined: {
-                name: "circuitSource";
-              };
-            };
+            "name": "circuitSource",
+            "type": {
+              "defined": {
+                "name": "circuitSource"
+              }
+            }
           },
           {
-            name: "bump";
-            type: "u8";
+            "name": "bump",
+            "type": "u8"
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "computationDefinitionMeta";
-      docs: ["A computation definition for execution in a MXE."];
-      type: {
-        kind: "struct";
-        fields: [
+      "name": "computationDefinitionMeta",
+      "docs": [
+        "A computation definition for execution in a MXE."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "circuitLen";
-            type: "u32";
+            "name": "circuitLen",
+            "type": "u32"
           },
           {
-            name: "signature";
-            type: {
-              defined: {
-                name: "computationSignature";
-              };
-            };
+            "name": "signature",
+            "type": {
+              "defined": {
+                "name": "computationSignature"
+              }
+            }
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "computationOutputs";
-      generics: [
+      "name": "computationOutputs",
+      "generics": [
         {
-          kind: "type";
-          name: "o";
+          "kind": "type",
+          "name": "o"
         }
-      ];
-      type: {
-        kind: "enum";
-        variants: [
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
           {
-            name: "success";
-            fields: [
+            "name": "success",
+            "fields": [
               {
-                generic: "o";
+                "generic": "o"
               }
-            ];
+            ]
           },
           {
-            name: "failure";
+            "name": "failure"
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "computationSignature";
-      docs: [
+      "name": "computationSignature",
+      "docs": [
         "The signature of a computation defined in a [ComputationDefinition]."
-      ];
-      type: {
-        kind: "struct";
-        fields: [
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "parameters";
-            type: {
-              vec: {
-                defined: {
-                  name: "parameter";
-                };
-              };
-            };
+            "name": "parameters",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "parameter"
+                }
+              }
+            }
           },
           {
-            name: "outputs";
-            type: {
-              vec: {
-                defined: {
-                  name: "output";
-                };
-              };
-            };
+            "name": "outputs",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "output"
+                }
+              }
+            }
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "epoch";
-      docs: ["The network epoch"];
-      type: {
-        kind: "struct";
-        fields: ["u64"];
-      };
+      "name": "epoch",
+      "docs": [
+        "The network epoch"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          "u64"
+        ]
+      }
     },
     {
-      name: "feePool";
-      type: {
-        kind: "struct";
-        fields: [
+      "name": "feePool",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "bump";
-            type: "u8";
+            "name": "bump",
+            "type": "u8"
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "localCircuitSource";
-      type: {
-        kind: "enum";
-        variants: [
+      "name": "healthRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "mxeKeygen";
+            "name": "patientId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "doctorId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "consultationDate",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "diagnosis",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                3
+              ]
+            }
+          },
+          {
+            "name": "symptoms",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                5
+              ]
+            }
+          },
+          {
+            "name": "treatmentPlan",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "medications",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                5
+              ]
+            }
+          },
+          {
+            "name": "notes",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "mxeAccount";
-      docs: ["A MPC Execution Environment."];
-      type: {
-        kind: "struct";
-        fields: [
+      "name": "healthRecordStoredEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "authority";
-            type: {
-              option: "pubkey";
-            };
+            "name": "recordId",
+            "type": "u64"
           },
           {
-            name: "cluster";
-            type: {
-              option: "u32";
-            };
-          },
-          {
-            name: "x25519Pubkey";
-            type: {
-              defined: {
-                name: "x25519Pubkey";
-              };
-            };
-          },
-          {
-            name: "fallbackClusters";
-            type: {
-              vec: "u32";
-            };
-          },
-          {
-            name: "rejectedClusters";
-            type: {
-              vec: "u32";
-            };
-          },
-          {
-            name: "computationDefinitions";
-            type: {
-              vec: "u32";
-            };
-          },
-          {
-            name: "bump";
-            type: "u8";
+            "name": "createdAt",
+            "type": "i64"
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "medicalRecord";
-      docs: ["The structure that holds encrypted medical record data"];
-      type: {
-        kind: "struct";
-        fields: [
+      "name": "localCircuitSource",
+      "type": {
+        "kind": "enum",
+        "variants": [
           {
-            name: "patientId";
-            docs: ["Encrypted patient identifier"];
-            type: {
-              array: ["u8", 32];
-            };
-          },
-          {
-            name: "doctorId";
-            docs: ["Encrypted doctor identifier"];
-            type: {
-              array: ["u8", 32];
-            };
-          },
-          {
-            name: "consultationDate";
-            docs: ["Encrypted date of consultation"];
-            type: {
-              array: ["u8", 32];
-            };
-          },
-          {
-            name: "diagnosis";
-            docs: ["Encrypted diagnosis information"];
-            type: {
-              array: ["u8", 32];
-            };
-          },
-          {
-            name: "symptoms";
-            docs: ["Encrypted symptoms description"];
-            type: {
-              array: ["u8", 32];
-            };
-          },
-          {
-            name: "treatmentPlan";
-            docs: ["Encrypted treatment plan"];
-            type: {
-              array: ["u8", 32];
-            };
-          },
-          {
-            name: "medications";
-            docs: ["Encrypted medications list"];
-            type: {
-              array: ["u8", 32];
-            };
-          },
-          {
-            name: "notes";
-            docs: ["Encrypted additional notes"];
-            type: {
-              array: ["u8", 32];
-            };
+            "name": "mxeKeygen"
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "nodeRef";
-      docs: [
+      "name": "mxeAccount",
+      "docs": [
+        "A MPC Execution Environment."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "cluster",
+            "type": {
+              "option": "u32"
+            }
+          },
+          {
+            "name": "x25519Pubkey",
+            "type": {
+              "defined": {
+                "name": "x25519Pubkey"
+              }
+            }
+          },
+          {
+            "name": "fallbackClusters",
+            "type": {
+              "vec": "u32"
+            }
+          },
+          {
+            "name": "rejectedClusters",
+            "type": {
+              "vec": "u32"
+            }
+          },
+          {
+            "name": "computationDefinitions",
+            "type": {
+              "vec": "u32"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "nodeRef",
+      "docs": [
         "A reference to a node in the cluster.",
         "The offset is to derive the Node Account.",
         "The current_total_rewards is the total rewards the node has received so far in the current",
         "epoch."
-      ];
-      type: {
-        kind: "struct";
-        fields: [
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "offset";
-            type: "u32";
+            "name": "offset",
+            "type": "u32"
           },
           {
-            name: "currentTotalRewards";
-            type: "u64";
+            "name": "currentTotalRewards",
+            "type": "u64"
           },
           {
-            name: "vote";
-            type: "u8";
+            "name": "vote",
+            "type": "u8"
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "offChainCircuitSource";
-      type: {
-        kind: "struct";
-        fields: [
+      "name": "offChainCircuitSource",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "source";
-            type: "string";
+            "name": "source",
+            "type": "string"
           },
           {
-            name: "hash";
-            type: {
-              array: ["u8", 32];
-            };
+            "name": "hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "onChainCircuitSource";
-      type: {
-        kind: "struct";
-        fields: [
+      "name": "onChainCircuitSource",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "isCompleted";
-            type: "bool";
+            "name": "isCompleted",
+            "type": "bool"
           },
           {
-            name: "uploadAuth";
-            type: "pubkey";
+            "name": "uploadAuth",
+            "type": "pubkey"
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "output";
-      docs: [
+      "name": "output",
+      "docs": [
         "An output of a computation.",
         "We currently don't support encrypted outputs yet since encrypted values are passed via",
         "data objects."
-      ];
-      type: {
-        kind: "enum";
-        variants: [
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
           {
-            name: "plaintextBool";
+            "name": "plaintextBool"
           },
           {
-            name: "plaintextU8";
+            "name": "plaintextU8"
           },
           {
-            name: "plaintextU16";
+            "name": "plaintextU16"
           },
           {
-            name: "plaintextU32";
+            "name": "plaintextU32"
           },
           {
-            name: "plaintextU64";
+            "name": "plaintextU64"
           },
           {
-            name: "plaintextU128";
+            "name": "plaintextU128"
           },
           {
-            name: "ciphertext";
+            "name": "ciphertext"
           },
           {
-            name: "arcisPubkey";
+            "name": "arcisPubkey"
           },
           {
-            name: "plaintextFloat";
+            "name": "plaintextFloat"
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "parameter";
-      docs: [
+      "name": "parameter",
+      "docs": [
         "A parameter of a computation.",
         "We differentiate between plaintext and encrypted parameters and data objects.",
         "Plaintext parameters are directly provided as their value.",
         "Encrypted parameters are provided as an offchain reference to the data.",
         "Data objects are provided as a reference to the data object account."
-      ];
-      type: {
-        kind: "enum";
-        variants: [
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
           {
-            name: "plaintextBool";
+            "name": "plaintextBool"
           },
           {
-            name: "plaintextU8";
+            "name": "plaintextU8"
           },
           {
-            name: "plaintextU16";
+            "name": "plaintextU16"
           },
           {
-            name: "plaintextU32";
+            "name": "plaintextU32"
           },
           {
-            name: "plaintextU64";
+            "name": "plaintextU64"
           },
           {
-            name: "plaintextU128";
+            "name": "plaintextU128"
           },
           {
-            name: "ciphertext";
+            "name": "ciphertext"
           },
           {
-            name: "arcisPubkey";
+            "name": "arcisPubkey"
           },
           {
-            name: "arcisSignature";
+            "name": "arcisSignature"
           },
           {
-            name: "plaintextFloat";
+            "name": "plaintextFloat"
           },
           {
-            name: "manticoreAlgo";
+            "name": "manticoreAlgo"
           },
           {
-            name: "inputDataset";
+            "name": "inputDataset"
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "receivedMedicalRecordEvent";
-      type: {
-        kind: "struct";
-        fields: [
+      "name": "receivedHealthRecordEvent",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "nonce";
-            type: {
-              array: ["u8", 16];
-            };
+            "name": "nonce",
+            "type": {
+              "array": [
+                "u8",
+                16
+              ]
+            }
           },
           {
-            name: "patientId";
-            type: {
-              array: ["u8", 32];
-            };
+            "name": "patientId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
-            name: "doctorId";
-            type: {
-              array: ["u8", 32];
-            };
+            "name": "doctorId",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
-            name: "consultationDate";
-            type: {
-              array: ["u8", 32];
-            };
+            "name": "consultationDate",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
-            name: "diagnosis";
-            type: {
-              array: ["u8", 32];
-            };
+            "name": "diagnosis",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                3
+              ]
+            }
           },
           {
-            name: "symptoms";
-            type: {
-              array: ["u8", 32];
-            };
+            "name": "symptoms",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                5
+              ]
+            }
           },
           {
-            name: "treatmentPlan";
-            type: {
-              array: ["u8", 32];
-            };
+            "name": "treatmentPlan",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
-            name: "medications";
-            type: {
-              array: ["u8", 32];
-            };
+            "name": "medications",
+            "type": {
+              "array": [
+                {
+                  "array": [
+                    "u8",
+                    32
+                  ]
+                },
+                5
+              ]
+            }
           },
           {
-            name: "notes";
-            type: {
-              array: ["u8", 32];
-            };
+            "name": "notes",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "shareMedicalRecordOutput";
-      docs: [
+      "name": "shareHealthRecordOutput",
+      "docs": [
         "The output of the callback instruction. Provided as a struct with ordered fields",
         "as anchor does not support tuples and tuple structs yet."
-      ];
-      type: {
-        kind: "struct";
-        fields: [
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "field0";
-            type: {
-              defined: {
-                name: "sharedEncryptedStruct";
-                generics: [
+            "name": "field0",
+            "type": {
+              "defined": {
+                "name": "sharedEncryptedStruct",
+                "generics": [
                   {
-                    kind: "const";
-                    value: "8";
+                    "kind": "const",
+                    "value": "18"
                   }
-                ];
-              };
-            };
+                ]
+              }
+            }
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "sharedEncryptedStruct";
-      generics: [
+      "name": "sharedEncryptedStruct",
+      "generics": [
         {
-          kind: "const";
-          name: "len";
-          type: "usize";
+          "kind": "const",
+          "name": "len",
+          "type": "usize"
         }
-      ];
-      type: {
-        kind: "struct";
-        fields: [
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "encryptionKey";
-            type: {
-              array: ["u8", 32];
-            };
+            "name": "encryptionKey",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           },
           {
-            name: "nonce";
-            type: "u128";
+            "name": "nonce",
+            "type": "u128"
           },
           {
-            name: "ciphertexts";
-            type: {
-              array: [
+            "name": "ciphertexts",
+            "type": {
+              "array": [
                 {
-                  array: ["u8", 32];
+                  "array": [
+                    "u8",
+                    32
+                  ]
                 },
                 {
-                  generic: "len";
+                  "generic": "len"
                 }
-              ];
-            };
+              ]
+            }
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "signerAccount";
-      type: {
-        kind: "struct";
-        fields: [
+      "name": "signerAccount",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "bump";
-            type: "u8";
+            "name": "bump",
+            "type": "u8"
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "timestamp";
-      type: {
-        kind: "struct";
-        fields: [
+      "name": "timestamp",
+      "type": {
+        "kind": "struct",
+        "fields": [
           {
-            name: "timestamp";
-            type: "u64";
+            "name": "timestamp",
+            "type": "u64"
           }
-        ];
-      };
+        ]
+      }
     },
     {
-      name: "x25519Pubkey";
-      type: {
-        kind: "enum";
-        variants: [
+      "name": "x25519Pubkey",
+      "type": {
+        "kind": "enum",
+        "variants": [
           {
-            name: "set";
-            fields: [
+            "name": "set",
+            "fields": [
               {
-                array: ["u8", 32];
+                "array": [
+                  "u8",
+                  32
+                ]
               }
-            ];
+            ]
           },
           {
-            name: "unset";
-            fields: [
+            "name": "unset",
+            "fields": [
               {
-                array: ["u8", 32];
+                "array": [
+                  "u8",
+                  32
+                ]
               },
               {
-                vec: "bool";
+                "vec": "bool"
               }
-            ];
+            ]
           }
-        ];
-      };
+        ]
+      }
     }
-  ];
+  ]
 };

@@ -3,7 +3,7 @@ use arcium_anchor::prelude::*;
 
 const COMP_DEF_OFFSET_SHARE_HEALTH_RECORD: u32 = comp_def_offset("share_health_record");
 
-declare_id!("C3BUuszcSAug8yp589QGV8xa7DpqLbPyRAm9qzJSMs3A");
+declare_id!("2MaYTbWLqs8nqLNPPrTz4KXkbhMt4hQKQaM3LVFQNnPG");
 
 #[arcium_program]
 pub mod epoch_telehealth {

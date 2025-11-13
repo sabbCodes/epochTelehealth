@@ -1,17 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import {
-  FileText,
-  Save,
-  Upload,
-  Plus,
-  Trash2,
-  Clock,
-  AlertCircle,
-} from "lucide-react";
+import { Save, Clock, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Card,
@@ -30,10 +21,16 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 
-import { Program, AnchorProvider, web3, setProvider } from "@coral-xyz/anchor";
+import {
+  Program,
+  AnchorProvider,
+  web3,
+  setProvider,
+  BN,
+} from "@coral-xyz/anchor";
 import { EpochTelehealth } from "./epoch_telehealth";
 import idl from "./epoch_telehealth.json";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Connection } from "@solana/web3.js";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { RescueCipher, getMXEPublicKey, x25519 } from "@arcium-hq/client";
 import { useToast } from "@/hooks/use-toast";
@@ -42,43 +39,112 @@ const idl_string = JSON.stringify(idl);
 const idl_object = JSON.parse(idl_string);
 const programID = new PublicKey(idl.address);
 
-// Browser-compatible crypto utilities
-const hashToU64 = async (s: string): Promise<bigint> => {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(s);
-  const hashBuffer = await crypto.subtle.digest(
-    "SHA-256",
-    data as BufferSource
-  );
-  const hashArray = new Uint8Array(hashBuffer);
-
-  let v = BigInt(0);
-  for (let i = 0; i < 8; i++) {
-    v |= BigInt(hashArray[i]) << (BigInt(i) * BigInt(8));
-  }
-  return v;
+// Generate UUID for recordId
+const generateUUID = (): string => {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
+    const r = (Math.random() * 16) | 0;
+    const v = c == "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
 };
 
-const randomBytes = (length: number): Uint8Array => {
-  return crypto.getRandomValues(new Uint8Array(length));
-};
+// Get nonce from environment
+const getNonce = (): Uint8Array => {
+  const envNonce = process.env.NEXT_PUBLIC_ENCRYPTION_NONCE;
 
-const getFixedNonce = (): Uint8Array => {
-  // Use a fixed nonce from environment or fallback
-  const nonceString =
-    process.env.NEXT_PUBLIC_ENCRYPTION_NONCE ||
-    "epoch-telehealth-default-nonce-12345";
-
-  const encoder = new TextEncoder();
-  const data = encoder.encode(nonceString);
-
-  // Ensure we have exactly 16 bytes
+  const hex = envNonce?.startsWith("0x") ? envNonce.slice(2) : envNonce;
   const nonce = new Uint8Array(16);
-  for (let i = 0; i < 16; i++) {
-    nonce[i] = data[i % data.length];
+  if (hex?.length === 32) {
+    for (let i = 0; i < 32; i += 2) {
+      nonce[i / 2] = parseInt(hex?.substring(i, i + 2), 16);
+    }
   }
 
-  return nonce; // Return as Uint8Array
+  return nonce;
+};
+
+// Get private key from environment
+const getPrivateKey = (): Uint8Array => {
+  const envPrivateKey = process.env.NEXT_PUBLIC_ENCRYPTION_PRIVATE_KEY;
+  
+  const hex = envPrivateKey?.startsWith('0x') ? envPrivateKey.slice(2) : envPrivateKey;
+  const privateKey = new Uint8Array(32);
+  if (hex?.length === 64) { // 32 bytes = 64 hex chars
+    for (let i = 0; i < 64; i += 2) {
+      privateKey[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+    }
+  }
+
+  console.log("✅ Using fixed private key from environment");
+  return privateKey;
+};
+
+// String encoding functions for u64/u128 types
+const stringToU64Array = (str: string, numU64s: number): bigint[] => {
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(str);
+  const result: bigint[] = [];
+
+  for (let i = 0; i < numU64s; i++) {
+    let value = BigInt(0);
+    for (let j = 0; j < 8; j++) {
+      const byteIndex = i * 8 + j;
+      if (byteIndex < bytes.length) {
+        value |= BigInt(bytes[byteIndex]) << BigInt(j * 8);
+      }
+    }
+    result.push(value);
+  }
+  return result;
+};
+
+const stringToU128 = (str: string): bigint => {
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(str);
+  let value = BigInt(0);
+
+  for (let i = 0; i < Math.min(bytes.length, 16); i++) {
+    value |= BigInt(bytes[i]) << BigInt(i * 8);
+  }
+  return value;
+};
+
+// Text splitting utilities for better UX
+const splitTextIntoFields = (
+  text: string,
+  fieldCount: number,
+  charsPerField: number
+): string[] => {
+  const result: string[] = [];
+  let remainingText = text;
+
+  for (let i = 0; i < fieldCount; i++) {
+    if (remainingText.length === 0) {
+      result.push(""); // Empty field
+      continue;
+    }
+
+    const chunk = remainingText.substring(0, charsPerField);
+    result.push(chunk);
+    remainingText = remainingText.substring(chunk.length);
+  }
+
+  return result;
+};
+
+// Helper function to convert string array to u64 array
+const stringArrayToU64Array = (
+  strings: string[],
+  numU64sPerString: number
+): bigint[] => {
+  const result: bigint[] = [];
+
+  for (const str of strings) {
+    const u64s = stringToU64Array(str, numU64sPerString);
+    result.push(...u64s);
+  }
+
+  return result;
 };
 
 interface HealthRecordFormProps {
@@ -108,7 +174,6 @@ export function HealthRecordForm({
     recordType: "consultation",
   });
 
-  // const [files, setFiles] = useState<{ name: string; type: string; size: string }[]>([])
   const [isSaving, setIsSaving] = useState(false);
 
   const handleChange = (field: string, value: string) => {
@@ -130,126 +195,20 @@ export function HealthRecordForm({
       throw new Error("Wallet not connected");
     }
 
-    const provider = new AnchorProvider(
-      connection,
-      wallet as any,
-      AnchorProvider.defaultOptions()
-    );
+    // Create a fresh connection to avoid blockhash issues
+    const freshConnection = new Connection(connection.rpcEndpoint, {
+      commitment: "confirmed",
+      confirmTransactionInitialTimeout: 60000, // 60 seconds
+    });
+
+    const provider = new AnchorProvider(freshConnection, wallet as any, {
+      commitment: "confirmed",
+      preflightCommitment: "confirmed",
+      skipPreflight: false,
+    });
     setProvider(provider);
     return provider;
   };
-
-  // const handleSubmit = async () => {
-  //   // Validate form data
-  //   if (!formData.diagnosis || !formData.symptoms || !formData.treatment) {
-  //     toast({
-  //       title: "Missing Required Fields",
-  //       description:
-  //         "Please fill in at least diagnosis, symptoms, and treatment fields.",
-  //       variant: "destructive",
-  //     });
-  //     return;
-  //   }
-
-  //   setIsSaving(true);
-
-  //   try {
-  //     const anchorProvider = getProvider();
-  //     const program = new Program<EpochTelehealth>(idl_object, anchorProvider);
-
-  //     // Get MXE public key for encryption
-  //     const mxePublicKey = await getMXEPublicKey(anchorProvider, programID);
-
-  //     // Generate encryption keys
-  //     const privateKey = x25519.utils.randomSecretKey();
-  //     const publicKey = x25519.getPublicKey(privateKey);
-
-  //     if (!publicKey) {
-  //       throw new Error("Failed to generate public key");
-  //     }
-
-  //     const sharedSecret = x25519.getSharedSecret(privateKey, mxePublicKey);
-  //     const cipher = new RescueCipher(sharedSecret);
-
-  //     // Convert form data to u64 hashes
-  //     const medicalData = [
-  //       await hashToU64(patientId),
-  //       await hashToU64(doctorId),
-  //       await hashToU64(new Date().toISOString()), // consultation date
-  //       await hashToU64(formData.diagnosis),
-  //       await hashToU64(formData.symptoms),
-  //       await hashToU64(formData.treatment),
-  //       await hashToU64(formData.medications),
-  //       await hashToU64(formData.notes),
-  //     ];
-
-  //     // Encrypt the medical data
-  //     const nonce = randomBytes(16);
-  //     const ciphertext = cipher.encrypt(medicalData, nonce);
-
-  //     // Validate ciphertext
-  //     if (!ciphertext || ciphertext.length !== 8) {
-  //       throw new Error("Invalid ciphertext generated");
-  //     }
-
-  //     // Derive the medical record PDA
-  //     const [medicalRecordPDA] = PublicKey.findProgramAddressSync(
-  //       [Buffer.from("medical_record"), wallet.publicKey!.toBuffer()],
-  //       programID
-  //     );
-
-  //     // Store encrypted medical record on-chain
-  //     const signature = await program.methods
-  //       .storeMedicalRecord(
-  //         Array.from(ciphertext[0]!),
-  //         Array.from(ciphertext[1]!),
-  //         Array.from(ciphertext[2]!),
-  //         Array.from(ciphertext[3]!),
-  //         Array.from(ciphertext[4]!),
-  //         Array.from(ciphertext[5]!),
-  //         Array.from(ciphertext[6]!),
-  //         Array.from(ciphertext[7]!)
-  //       )
-  //       .accounts({
-  //         payer: wallet.publicKey!,
-  //         systemProgram: web3.SystemProgram.programId,
-  //         medicalRecord: medicalRecordPDA,
-  //       })
-  //       .rpc({ commitment: "confirmed" });
-
-  //     console.log("Medical record stored successfully! Signature:", signature);
-
-  //     toast({
-  //       title: "Success!",
-  //       description: (
-  //         <div>
-  //           <p>Medical record encrypted and stored on-chain successfully.</p>
-  //           <p className="text-xs mt-1 break-all">Tx: {signature}</p>
-  //         </div>
-  //       ),
-  //     });
-
-  //     if (onSave) {
-  //       onSave({
-  //         ...formData,
-  //         patientId,
-  //         createdAt: new Date().toISOString(),
-  //         signature,
-  //       });
-  //     }
-  //   } catch (err) {
-  //     console.error("Error submitting record:", err);
-  //     const errorMessage =
-  //       err instanceof Error ? err.message : "Unknown error occurred";
-  //     toast({
-  //       title: "Failed to Store Record",
-  //       description: `Error: ${errorMessage}. Please ensure your wallet is connected and try again.`,
-  //       variant: "destructive",
-  //     });
-  //   } finally {
-  //     setIsSaving(false);
-  //   }
-  // };
 
   const handleSubmit = async () => {
     // Validate form data
@@ -269,54 +228,86 @@ export function HealthRecordForm({
       const anchorProvider = getProvider();
       const program = new Program<EpochTelehealth>(idl_object, anchorProvider);
 
-      // Get MXE public key for encryption
+      // Get MXE public key for encryption WITH NULL CHECK
+      console.log("Fetching MXE public key...");
       const mxePublicKey = await getMXEPublicKey(anchorProvider, programID);
 
+      // ADDED: Critical null check
+      if (!mxePublicKey) {
+        throw new Error(
+          "Failed to get MXE public key - received null. Check program ID and network connection."
+        );
+      }
+
+      console.log(
+        "MXE public key obtained:",
+        Buffer.from(mxePublicKey).toString("hex")
+      );
+
       // Generate encryption keys
-      const privateKey = x25519.utils.randomSecretKey();
+      const privateKey = getPrivateKey();
       const publicKey = x25519.getPublicKey(privateKey);
 
       if (!publicKey) {
         throw new Error("Failed to generate public key");
       }
 
+      // Now mxePublicKey is guaranteed to not be null
       const sharedSecret = x25519.getSharedSecret(privateKey, mxePublicKey);
       const cipher = new RescueCipher(sharedSecret);
 
-      // Generate deterministic nonce using record ID, doctor ID, and patient ID
-      const nonce = getFixedNonce();
-      console.log("Generated deterministic nonce:", Array.from(nonce));
+      // Generate record ID from UUID
+      const recordUUID = generateUUID();
+      // Convert UUID to numeric record ID (using first 8 bytes of hash)
+      const recordId = new BN(
+        Array.from(new TextEncoder().encode(recordUUID))
+          .slice(0, 8)
+          .reduce((acc, byte, i) => acc + (byte << (i * 8)), 0)
+      );
 
-      // Convert text directly to bigint (without hashing)
-      const textToBigInt = (s: string): bigint => {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(s);
+      // Get nonce (from env or random)
+      const nonce = getNonce();
 
-        // Convert first 8 bytes to bigint (same as your hashToU64 but without hashing)
-        let value = BigInt(0);
-        for (let i = 0; i < Math.min(8, data.length); i++) {
-          value |= BigInt(data[i]) << (BigInt(i) * BigInt(8));
-        }
-        return value;
-      };
+      // AUTOMATIC TEXT SPLITTING FOR BETTER UX
+      console.log("Preparing health record data...");
+      const diagnosisFields = splitTextIntoFields(formData.diagnosis, 3, 8);
+      const diagnosisParts = stringArrayToU64Array(diagnosisFields, 1);
 
-      // Then use this instead of hashToU64:
-      const medicalData = [
-        textToBigInt(patientId),
-        textToBigInt(doctorId),
-        textToBigInt(new Date().toISOString()),
-        textToBigInt(formData.diagnosis),
-        textToBigInt(formData.symptoms),
-        textToBigInt(formData.treatment),
-        textToBigInt(formData.medications),
-        textToBigInt(formData.notes),
+      const symptomFields = splitTextIntoFields(formData.symptoms, 5, 8);
+      const symptoms = stringArrayToU64Array(symptomFields, 1);
+
+      const treatmentPlan = stringToU128(formData.treatment.substring(0, 16));
+
+      const medicationFields = splitTextIntoFields(formData.medications, 5, 8);
+      const medications = stringArrayToU64Array(medicationFields, 1);
+
+      const notes = stringToU128(formData.notes.substring(0, 16));
+
+      // Basic identifiers
+      const patientIdBigInt = stringToU128(patientId.substring(0, 16));
+      const doctorIdBigInt = stringToU128(doctorId.substring(0, 16));
+      const consultationDate = BigInt(Math.floor(Date.now() / 1000));
+
+      // Combine all data for encryption (18 total fields: 4 u128 + 14 u64)
+      const healthRecordData = [
+        patientIdBigInt, // u128 - patient_id
+        doctorIdBigInt, // u128 - doctor_id
+        consultationDate, // u64 - consultation_date
+        ...diagnosisParts, // 3 x u64 - diagnosis array
+        ...symptoms, // 5 x u64 - symptoms array
+        treatmentPlan, // u128 - treatment_plan
+        ...medications, // 5 x u64 - medications array
+        notes, // u128 - notes
       ];
 
-      // Encrypt the medical data with deterministic nonce
-      const ciphertext = cipher.encrypt(medicalData, nonce);
+      console.log("Health record data prepared");
+
+      // Encrypt the medical data
+      console.log("Encrypting data...");
+      const ciphertext: number[][] = cipher.encrypt(healthRecordData, nonce);
 
       // Validate ciphertext
-      if (!ciphertext || ciphertext.length !== 8) {
+      if (!ciphertext || ciphertext.length !== 18) {
         console.error("Ciphertext length:", ciphertext?.length);
         throw new Error("Invalid ciphertext generated");
       }
@@ -329,9 +320,14 @@ export function HealthRecordForm({
         }
       }
 
-      // Derive the medical record PDA
-      const [medicalRecordPDA] = PublicKey.findProgramAddressSync(
-        [Buffer.from("medical_record"), wallet.publicKey!.toBuffer()],
+      // Derive the health record PDA using recordId
+      console.log("Deriving PDA...");
+      const [healthRecordPDA] = PublicKey.findProgramAddressSync(
+        [
+          Buffer.from("health_record"),
+          wallet.publicKey!.toBuffer(),
+          recordId.toArrayLike(Buffer, "le", 8),
+        ],
         programID
       );
 
@@ -341,34 +337,76 @@ export function HealthRecordForm({
         return Array.from(ct);
       });
 
-      // Store encrypted medical record on-chain
-      const signature = await program.methods
-        .storeMedicalRecord(
-          ciphertextArrays[0],
-          ciphertextArrays[1],
-          ciphertextArrays[2],
-          ciphertextArrays[3],
-          ciphertextArrays[4],
-          ciphertextArrays[5],
-          ciphertextArrays[6],
-          ciphertextArrays[7]
-        )
-        .accounts({
-          payer: wallet.publicKey!,
-          systemProgram: web3.SystemProgram.programId,
-          medicalRecord: medicalRecordPDA,
-        })
-        .rpc({ commitment: "confirmed" });
+      console.log("Sending transaction...");
 
-      console.log("Medical record stored successfully! Signature:", signature);
-      console.log("Medical Record PDA:", medicalRecordPDA.toString());
+      // Store encrypted health record on-chain with retry logic
+      let retries = 3;
+      let signature: string = "";
+
+      while (retries > 0) {
+        try {
+          signature = await program.methods
+            .storeHealthRecord(
+              recordId,
+              ciphertextArrays[0], // patient_id
+              ciphertextArrays[1], // doctor_id
+              ciphertextArrays[2], // consultation_date
+              [
+                ciphertextArrays[3], // diagnosis part 1
+                ciphertextArrays[4], // diagnosis part 2
+                ciphertextArrays[5], // diagnosis part 3
+              ],
+              [
+                ciphertextArrays[6], // symptom1
+                ciphertextArrays[7], // symptom2
+                ciphertextArrays[8], // symptom3
+                ciphertextArrays[9], // symptom4
+                ciphertextArrays[10], // symptom5
+              ],
+              ciphertextArrays[11], // treatment_plan
+              [
+                ciphertextArrays[12], // medication1
+                ciphertextArrays[13], // medication2
+                ciphertextArrays[14], // medication3
+                ciphertextArrays[15], // medication4
+                ciphertextArrays[16], // medication5
+              ],
+              ciphertextArrays[17] // notes
+            )
+            .accounts({
+              doctor: wallet.publicKey!,
+              systemProgram: web3.SystemProgram.programId,
+              healthRecord: healthRecordPDA,
+            })
+            .signers([]) // Wallet is already signer
+            .rpc({
+              commitment: "confirmed",
+              skipPreflight: false,
+              preflightCommitment: "confirmed",
+            });
+
+          break; // Success, break out of retry loop
+        } catch (err: any) {
+          retries--;
+          if (retries === 0) throw err;
+
+          console.log(`Retrying transaction... ${retries} attempts left`);
+          // Wait before retrying
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+      }
+
+      console.log("Health record stored successfully! Signature:", signature);
+      console.log("Health Record PDA:", healthRecordPDA.toString());
+      console.log("Record UUID:", recordUUID);
 
       toast({
         title: "Success!",
         description: (
           <div>
-            <p>Medical record encrypted and stored on-chain successfully.</p>
-            <p className="text-xs mt-1 break-all">Tx: {signature}</p>
+            <p>Health record encrypted and stored on-chain successfully.</p>
+            <p className="text-xs mt-1">Record ID: {recordUUID}</p>
+            <p className="text-xs break-all">Tx: {signature}</p>
           </div>
         ),
       });
@@ -377,17 +415,36 @@ export function HealthRecordForm({
         onSave({
           ...formData,
           patientId,
+          recordId: recordUUID,
           createdAt: new Date().toISOString(),
           signature,
+          pda: healthRecordPDA.toString(),
         });
       }
     } catch (err) {
       console.error("Error submitting record:", err);
-      const errorMessage =
-        err instanceof Error ? err.message : "Unknown error occurred";
+      let errorMessage = "Unknown error occurred";
+
+      if (err instanceof Error) {
+        errorMessage = err.message;
+
+        // Provide more user-friendly error messages
+        if (errorMessage.includes("Blockhash not found")) {
+          errorMessage =
+            "Network connection issue. Please check your internet connection and try again.";
+        } else if (errorMessage.includes("Transaction simulation failed")) {
+          errorMessage =
+            "Transaction failed. Please ensure you have sufficient SOL for transaction fees.";
+        } else if (errorMessage.includes("User rejected")) {
+          errorMessage = "Transaction was rejected by your wallet.";
+        } else if (errorMessage.includes("failed to send transaction")) {
+          errorMessage = "Failed to send transaction. Please try again.";
+        }
+      }
+
       toast({
         title: "Failed to Store Record",
-        description: `Error: ${errorMessage}. Please ensure your wallet is connected and try again.`,
+        description: `Error: ${errorMessage}`,
         variant: "destructive",
       });
     } finally {
@@ -446,124 +503,99 @@ export function HealthRecordForm({
         </div>
 
         <div>
-          <Label htmlFor="diagnosis">Diagnosis</Label>
-          <Input
+          <Label htmlFor="diagnosis">
+            Diagnosis{" "}
+            <span className="text-xs text-gray-500">(up to 24 characters)</span>
+          </Label>
+          <Textarea
             id="diagnosis"
             value={formData.diagnosis}
             onChange={(e) => handleChange("diagnosis", e.target.value)}
             placeholder="Enter diagnosis"
+            maxLength={24}
           />
+          <p className="text-xs text-gray-500 mt-1">
+            {formData.diagnosis.length}/24 characters
+          </p>
         </div>
 
         <div>
-          <Label htmlFor="symptoms">Symptoms</Label>
+          <Label htmlFor="symptoms">
+            Symptoms{" "}
+            <span className="text-xs text-gray-500">(up to 40 characters)</span>
+          </Label>
           <Textarea
             id="symptoms"
             value={formData.symptoms}
             onChange={(e) => handleChange("symptoms", e.target.value)}
             placeholder="Describe patient symptoms"
             className="min-h-[80px]"
+            maxLength={40}
           />
+          <p className="text-xs text-gray-500 mt-1">
+            {formData.symptoms.length}/40 characters
+          </p>
         </div>
 
         <div>
-          <Label htmlFor="treatment">Treatment Plan</Label>
+          <Label htmlFor="treatment">
+            Treatment Plan{" "}
+            <span className="text-xs text-gray-500">(up to 16 characters)</span>
+          </Label>
           <Textarea
             id="treatment"
             value={formData.treatment}
             onChange={(e) => handleChange("treatment", e.target.value)}
             placeholder="Describe the treatment plan"
             className="min-h-[80px]"
+            maxLength={16}
           />
+          <p className="text-xs text-gray-500 mt-1">
+            {formData.treatment.length}/16 characters
+          </p>
         </div>
 
         <div>
-          <Label htmlFor="medications">Medications</Label>
+          <Label htmlFor="medications">
+            Medications{" "}
+            <span className="text-xs text-gray-500">(up to 40 characters)</span>
+          </Label>
           <Textarea
             id="medications"
             value={formData.medications}
             onChange={(e) => handleChange("medications", e.target.value)}
             placeholder="List prescribed medications with dosage"
             className="min-h-[80px]"
+            maxLength={40}
           />
+          <p className="text-xs text-gray-500 mt-1">
+            {formData.medications.length}/40 characters
+          </p>
         </div>
 
         <div>
-          <Label htmlFor="notes">Additional Notes</Label>
+          <Label htmlFor="notes">
+            Additional Notes{" "}
+            <span className="text-xs text-gray-500">(up to 16 characters)</span>
+          </Label>
           <Textarea
             id="notes"
             value={formData.notes}
             onChange={(e) => handleChange("notes", e.target.value)}
             placeholder="Any additional notes or observations"
             className="min-h-[80px]"
+            maxLength={16}
           />
+          <p className="text-xs text-gray-500 mt-1">
+            {formData.notes.length}/16 characters
+          </p>
         </div>
-
-        {/* <div>
-          <div className="flex items-center justify-between mb-2">
-            <Label>Attachments</Label>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" className="flex items-center">
-                  <Plus className="w-4 h-4 mr-1" />
-                  Add File
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Upload Files</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
-                    <Upload className="w-10 h-10 text-gray-400 mx-auto mb-4" />
-                    <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                      Drag and drop files here, or click to browse
-                    </p>
-                    <Button onClick={handleAddFile}>Browse Files</Button>
-                  </div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Supported formats: PDF, JPG, PNG, DOCX (Max size: 10MB)
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          <div className="space-y-2 mt-2">
-            {files.length === 0 ? (
-              <div className="text-sm text-gray-500 dark:text-gray-400 italic">No files attached</div>
-            ) : (
-              files.map((file, index) => (
-                <div
-                  key={index}
-                  className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-md"
-                >
-                  <div className="flex items-center">
-                    <FileText className="w-4 h-4 text-blue-600 mr-2" />
-                    <div>
-                      <p className="text-sm font-medium">{file.name}</p>
-                      <p className="text-xs text-gray-500">{file.size}</p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleRemoveFile(index)}
-                    className="h-8 w-8 p-0 text-red-500"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              ))
-            )}
-          </div>
-        </div> */}
 
         <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-md flex items-start space-x-2">
           <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
           <div className="text-sm text-amber-800 dark:text-amber-300">
             This record will be encrypted & securely stored on the blockchain,
-            powered by Arcium.
+            powered by Arcium. Character limits ensure proper encryption.
           </div>
         </div>
       </CardContent>

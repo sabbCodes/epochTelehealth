@@ -26,15 +26,35 @@
       "static/chunks/main-app.js",
       "static/chunks/app/signin/loading.js"
     ],
-    "/pharmacy-dashboard/page": [
+    "/doctor-dashboard/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/pharmacy-dashboard/page.js"
+      "static/chunks/app/doctor-dashboard/page.js"
     ],
-    "/pharmacy-dashboard/loading": [
+    "/chat/doctor/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/pharmacy-dashboard/loading.js"
+      "static/chunks/app/chat/doctor/page.js"
+    ],
+    "/chat/doctor/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/chat/doctor/loading.js"
+    ],
+    "/dashboard/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/dashboard/page.js"
+    ],
+    "/records/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/records/page.js"
+    ],
+    "/records/loading": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/records/loading.js"
     ],
     "/_not-found/page": [
       "static/chunks/webpack.js",

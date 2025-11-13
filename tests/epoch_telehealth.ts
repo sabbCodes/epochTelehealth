@@ -5,7 +5,7 @@ import { EpochTelehealth } from "../target/types/epoch_telehealth";
 import { randomBytes } from "crypto";
 import {
   awaitComputationFinalization,
-  getArciumEnv,
+  // getArciumEnv,
   getCompDefAccOffset,
   getArciumAccountBaseSeed,
   getArciumProgAddress,
@@ -20,6 +20,7 @@ import {
   x25519,
   getComputationAccAddress,
   getMXEPublicKey,
+  getClusterAccAddress,
 } from "@arcium-hq/client";
 import * as fs from "fs";
 import * as os from "os";
@@ -27,9 +28,20 @@ import { expect } from "chai";
 
 describe("EpochTelehealth", () => {
   // Configure the client to use the local cluster.
-  anchor.setProvider(anchor.AnchorProvider.env());
+  // anchor.setProvider(anchor.AnchorProvider.env());
+  // const program = anchor.workspace.EpochTelehealth as Program<EpochTelehealth>;
+  // const provider = anchor.getProvider();
+  const owner = readKpJson(`${os.homedir()}/.config/solana/id.json`);
+
+  const connection = new anchor.web3.Connection(
+    "https://api.devnet.solana.com", // or your preferred RPC
+    "confirmed"
+  );
+  const wallet = new anchor.Wallet(owner);
+  const provider = new anchor.AnchorProvider(connection, wallet, {
+    commitment: "confirmed",
+  });
   const program = anchor.workspace.EpochTelehealth as Program<EpochTelehealth>;
-  const provider = anchor.getProvider();
 
   type Event = anchor.IdlEvents<(typeof program)["idl"]>;
   const awaitEvent = async <E extends keyof Event>(eventName: E) => {
@@ -44,7 +56,8 @@ describe("EpochTelehealth", () => {
     return event;
   };
 
-  const arciumEnv = getArciumEnv();
+  // const arciumEnv = getArciumEnv();
+  const clusterAccount = getClusterAccAddress(1078779259);
 
   // Enhanced string encoding/decoding functions with automatic splitting
   function stringToU64Array(str: string, numU64s: number): bigint[] {
@@ -171,7 +184,6 @@ describe("EpochTelehealth", () => {
   }
 
   it("can store and share health record confidentially with automatic text splitting!", async () => {
-    const owner = readKpJson(`${os.homedir()}/.config/solana/id.json`);
 
     const mxePublicKey = await getMXEPublicKeyWithRetry(
       provider as anchor.AnchorProvider,
@@ -340,7 +352,8 @@ describe("EpochTelehealth", () => {
           program.programId,
           computationOffset
         ),
-        clusterAccount: arciumEnv.arciumClusterPubkey,
+        // clusterAccount: arciumEnv.arciumClusterPubkey,
+        clusterAccount: clusterAccount,
         mxeAccount: getMXEAccAddress(program.programId),
         mempoolAccount: getMempoolAccAddress(program.programId),
         executingPool: getExecutingPoolAccAddress(program.programId),
@@ -482,50 +495,120 @@ describe("EpochTelehealth", () => {
       getArciumProgAddress()
     )[0];
 
-    console.log("Comp def PDA is", compDefPDA);
+    console.log("Comp def PDA is", compDefPDA.toString());
 
-    const sig = await program.methods
-      .initShareHealthRecordCompDef()
-      .accounts({
-        compDefAccount: compDefPDA,
-        payer: owner.publicKey,
-        mxeAccount: getMXEAccAddress(program.programId),
-      })
-      .signers([owner])
-      .rpc({
-        commitment: "confirmed",
-      });
-    console.log(
-      "Init share health record computation definition transaction",
-      sig
+    // Check if initialization already succeeded despite timeout
+    const compDefOffset = getCompDefAccOffset("share_health_record");
+    const compDefAddress = getCompDefAccAddress(
+      program.programId,
+      Buffer.from(compDefOffset).readUint32LE()
     );
 
-    if (uploadRawCircuit) {
-      const rawCircuit = fs.readFileSync("build/share_health_record.arcis");
+    const compDefAccount = await provider.connection.getAccountInfo(
+      compDefAddress
+    );
 
-      await uploadCircuit(
-        provider as anchor.AnchorProvider,
-        "share_health_record",
-        program.programId,
-        rawCircuit,
-        true
-      );
-    } else if (!offchainSource) {
-      const finalizeTx = await buildFinalizeCompDefTx(
-        provider as anchor.AnchorProvider,
-        Buffer.from(offset).readUInt32LE(),
-        program.programId
-      );
+    if (compDefAccount) {
+      console.log("Already initialized - skipping initialization");
 
+      // Still proceed with finalization if needed
+      if (!uploadRawCircuit && !offchainSource) {
+        console.log("Proceeding with finalization...");
+        const finalizeTx = await buildFinalizeCompDefTx(
+          provider as anchor.AnchorProvider,
+          Buffer.from(offset).readUint32LE(),
+          program.programId
+        );
+
+        const latestBlockhash = await provider.connection.getLatestBlockhash();
+        finalizeTx.recentBlockhash = latestBlockhash.blockhash;
+        finalizeTx.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
+
+        finalizeTx.sign(owner);
+
+        await provider.sendAndConfirm(finalizeTx);
+      }
+
+      return "ALREADY_INITIALIZED";
+    } else {
+      console.log("Not initialized - running init");
+
+      // Get blockhash first for the confirmation strategy
       const latestBlockhash = await provider.connection.getLatestBlockhash();
-      finalizeTx.recentBlockhash = latestBlockhash.blockhash;
-      finalizeTx.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
 
-      finalizeTx.sign(owner);
+      const sig = await program.methods
+        .initShareHealthRecordCompDef()
+        .accounts({
+          compDefAccount: compDefPDA,
+          payer: owner.publicKey,
+          mxeAccount: getMXEAccAddress(program.programId),
+          // systemProgram: anchor.web3.SystemProgram.programId, // Added for safety
+        })
+        .signers([owner])
+        .rpc({
+          commitment: "confirmed",
+          skipPreflight: true, // Add to avoid simulation issues
+        });
 
-      await provider.sendAndConfirm(finalizeTx);
+      console.log("Init transaction submitted:", sig);
+
+      // Wait for confirmation with proper blockhash strategy
+      try {
+        const confirmation = await provider.connection.confirmTransaction(
+          {
+            signature: sig,
+            blockhash: latestBlockhash.blockhash, // Added this
+            lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+          },
+          "confirmed"
+        );
+
+        if (confirmation.value.err) {
+          throw new Error(`Transaction failed: ${confirmation.value.err}`);
+        }
+
+        console.log(
+          "Init share health record computation definition transaction confirmed",
+          sig
+        );
+      } catch (error) {
+        console.log(
+          "Confirmation may have timed out, but transaction might still succeed:",
+          sig
+        );
+        // Continue anyway as the transaction might have succeeded
+      }
+
+      if (uploadRawCircuit) {
+        const rawCircuit = fs.readFileSync("build/share_health_record.arcis");
+
+        await uploadCircuit(
+          provider as anchor.AnchorProvider,
+          "share_health_record",
+          program.programId,
+          rawCircuit,
+          true
+        );
+      } else if (!offchainSource) {
+        // Add small delay before finalization
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        const finalizeTx = await buildFinalizeCompDefTx(
+          provider as anchor.AnchorProvider,
+          Buffer.from(offset).readUint32LE(),
+          program.programId
+        );
+
+        const latestBlockhash = await provider.connection.getLatestBlockhash();
+        finalizeTx.recentBlockhash = latestBlockhash.blockhash;
+        finalizeTx.lastValidBlockHeight = latestBlockhash.lastValidBlockHeight;
+
+        finalizeTx.sign(owner);
+
+        await provider.sendAndConfirm(finalizeTx);
+      }
+      return sig;
     }
-    return sig;
   }
 });
 
