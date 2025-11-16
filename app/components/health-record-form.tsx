@@ -245,8 +245,11 @@ export function HealthRecordForm({
       );
 
       // Generate encryption keys
-      const privateKey = getPrivateKey();
+      const privateKey = x25519.utils.randomSecretKey();
       const publicKey = x25519.getPublicKey(privateKey);
+
+      const privateKeyHex = Buffer.from(privateKey).toString('hex');
+      console.log('NEXT_PUBLIC_ENCRYPTION_PRIVATE_KEY=' + privateKeyHex);
 
       if (!publicKey) {
         throw new Error("Failed to generate public key");
@@ -378,7 +381,7 @@ export function HealthRecordForm({
               systemProgram: web3.SystemProgram.programId,
               healthRecord: healthRecordPDA,
             })
-            .signers([]) // Wallet is already signer
+            .signers([]) // Wallet is already signer Acute Malaria Headache, fever, malaise medication ACT, paracetamol & ciprofloxacin Check in 3 days
             .rpc({
               commitment: "confirmed",
               skipPreflight: false,
