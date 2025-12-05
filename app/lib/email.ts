@@ -26,7 +26,7 @@ export interface AppointmentDetails {
   duration: string;
   meetingLink?: string;
   type: "video" | "extended_video" | "chat";
-  icalEvent?: string; // iCal event as string
+  icalEvent?: string;
   recipientType: "patient" | "doctor";
 }
 
@@ -35,15 +35,13 @@ export async function sendAppointmentConfirmation(
   appointment: AppointmentDetails & { icalEvent?: string }
 ) {
   try {
-    // Create the email component first to get the subject
     const emailComponent = AppointmentEmail({ appointment });
 
-    // Prepare the email data according to Resend's API
     const emailData: EmailData = {
-      from: "Sabb | epochTeleHealth <delivered@resend.dev>",
-      to: "epochtelehealth@gmail.com",
+      from: "Sabb | epochTeleHealth <noreply@epochtelehealth.com>",
+      to: to,
       subject: `Appointment ${appointment.recipientType === "patient" ? "Confirmed" : "Scheduled"}: Dr. ${appointment.doctorName}`,
-      react: emailComponent, // Pass the React component directly
+      react: emailComponent,
     };
 
     // Add iCal event as attachment if provided

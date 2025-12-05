@@ -48,46 +48,60 @@ export default function DoctorsPage() {
   ])
   const [currentMessage, setCurrentMessage] = useState("")
 
-  // Fetch doctors and apply filters
+  // Fetch specialties once on mount
   useEffect(() => {
-    const loadData = async () => {
+    let isMounted = true;
+    const loadSpecialties = async () => {
       try {
-        setLoading(true);
-        const [doctorsData, specialtiesData] = await Promise.all([
-          fetchDoctors({ searchQuery, specialty: selectedSpecialty }),
-          getDoctorSpecialties(),
-        ]);
-        
-        // Set specialties from the fetched data
-        if (specialtiesData) {
-          setSpecialties(specialtiesData);
-        }
-        
-        // Transform the data to include computed properties
-        const transformedDoctors = doctorsData.map(doctor => ({
-          ...doctor,
-          name: `${doctor.first_name} ${doctor.last_name}`,
-          location: [doctor.city, doctor.country].filter(Boolean).join(', ')
-        }));
-        setDoctors(transformedDoctors);
-        
-        setError(null);
-      } catch (error) {
-        console.error("Error loading data:", error);
-        setError('Failed to load doctors. Please try again later.');
-      } finally {
-        setLoading(false);
+        const specialtiesData = await getDoctorSpecialties();
+        if (isMounted && specialtiesData) setSpecialties(specialtiesData);
+      } catch (err) {
+        console.error("Error loading specialties:", err);
       }
     };
-    
-    // Add debounce to search
+    loadSpecialties();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Fetch doctors and apply filters (debounced). Only depends on searchQuery and selectedSpecialty.
+  useEffect(() => {
+    let isMounted = true;
+    const loadDoctors = async () => {
+      try {
+        setLoading(true);
+        const doctorsData = await fetchDoctors({ searchQuery, specialty: selectedSpecialty });
+
+        // Transform the data to include computed properties
+        const transformedDoctors = doctorsData.map((doctor) => ({
+          ...doctor,
+          name: `${doctor.first_name} ${doctor.last_name}`,
+          location: [doctor.city, doctor.country].filter(Boolean).join(", "),
+        }));
+
+        if (isMounted) {
+          setDoctors(transformedDoctors);
+          setError(null);
+        }
+      } catch (error) {
+        console.error("Error loading data:", error);
+        if (isMounted) setError("Failed to load doctors. Please try again later.");
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
     const timer = setTimeout(() => {
-      loadData();
+      loadDoctors();
     }, 300);
-    
-    return () => clearTimeout(timer);
-  }, [searchQuery, selectedSpecialty, specialties.length]);
-  
+
+    return () => {
+      isMounted = false;
+      clearTimeout(timer);
+    };
+  }, [searchQuery, selectedSpecialty]);
+
   // Format experience text
   const getExperienceText = (years: number | undefined) => {
     if (!years) return 'Experience not specified';

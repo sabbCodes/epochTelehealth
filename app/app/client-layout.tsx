@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { W3sProvider } from "@/providers/W3sProvider";
 import { SolanaProvider } from "@/providers/SolanaProvider";
+import { WherebyProvider } from "@whereby.com/browser-sdk/react";
 
 export default function ClientLayout({
   children,
@@ -23,7 +24,11 @@ export default function ClientLayout({
   }, [router]);
   return (
     <W3sProvider>
-      <SolanaProvider>{children}</SolanaProvider>
+      <SolanaProvider>
+        <WherebyProvider>
+          {children}
+        </WherebyProvider>
+      </SolanaProvider>
     </W3sProvider>
   );
 }

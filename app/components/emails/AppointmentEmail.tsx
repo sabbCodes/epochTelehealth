@@ -61,7 +61,7 @@ export function AppointmentEmail({ appointment }: AppointmentEmailProps) {
             <Text style={value}>{time}</Text>
 
             <Text style={label}>Duration</Text>
-            <Text style={value}>{duration}</Text>
+            <Text style={value}>{duration} minutes</Text>
 
             <Text style={label}>Appointment Type</Text>
             <Text style={value}>

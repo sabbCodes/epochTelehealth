@@ -11,6 +11,8 @@ export interface Schedule {
   consultation_type: string;
   status: "scheduled" | "completed" | "cancelled";
   notes?: string | null;
+  room_url?: string | null;
+  meeting_id?: string | null;
   created_at: string;
   updated_at: string;
 }
