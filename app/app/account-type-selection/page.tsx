@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import {
@@ -15,14 +15,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
-import { useW3s } from "@/providers/W3sProvider";
-import type {
-  Error as CircleError,
-  ChallengeResult,
-  SignMessageResult,
-  SignTransactionResult,
-} from "@circle-fin/w3s-pw-web-sdk/src/types";
 import Image from "next/image";
+import {
+  usePhantom,
+  useModal,
+  useDisconnect,
+} from "@phantom/react-sdk";
 
 export default function AccountTypeSelectionPage() {
   const router = useRouter();
@@ -34,7 +32,43 @@ export default function AccountTypeSelectionPage() {
     "patient" | "doctor" | "pharmacy" | "admin" | null
   >(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [pinLoading, setPinLoading] = useState(false);
+
+  const { addresses, isConnected } = usePhantom();
+  const { open } = useModal();
+  const { disconnect } = useDisconnect();
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+
+  // Effect to update wallet address when it changes
+  useEffect(() => {
+    if (isConnected && addresses?.length > 0) {
+      const solanaAddress = addresses[0]?.address;
+      setWalletAddress(solanaAddress);
+    }
+  }, [addresses, isConnected]);
+
+  // Custom connect button handler
+  const handleConnectWallet = () => {
+    open();
+  };
+
+  // Disconnect handler
+  const handleDisconnect = async () => {
+    try {
+      await disconnect();
+      setWalletAddress(null);
+      toast({
+        title: "Wallet Disconnected",
+        description: "Your wallet has been disconnected successfully.",
+      });
+    } catch (error) {
+      console.error("Error disconnecting wallet:", error);
+      toast({
+        title: "Error",
+        description: "Failed to disconnect wallet. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const accountTypes = [
     {
@@ -94,202 +128,28 @@ export default function AccountTypeSelectionPage() {
     // },
   ];
 
-  const web3Services = useW3s();
-
   const handleContinue = async () => {
-    if (!selectedType) return;
-
-    setIsLoading(true);
+    if (!selectedType || !walletAddress) {
+      toast({
+        title: "Error",
+        description: "Please select an account type and connect your wallet",
+        variant: "destructive",
+      });
+      return;
+    }
 
     try {
-      // Get parameters from URL
-      const email = searchParams.get("email") || "";
-
-      if (!email) {
-        toast({
-          variant: "destructive",
-          title: "Missing Information",
-          description: "Please go back and try again.",
-        });
-        setIsLoading(false);
-        return;
-      }
-
+      setIsLoading(true);
+      // Use the walletAddress from state
+      router.push(`/onboarding/${selectedType}?walletAddress=${walletAddress}&email=${email}`);
+    } catch (error) {
+      console.error("Error during account type selection:", error);
       toast({
-        title: "Initializing your wallet...",
-        description:
-          "Setting up secure wallet infrastructure for your account.",
-      });
-
-      // Step 1: Initialize wallet (create user, get tokens, setup PIN if needed)
-      const initRes = await fetch("/api/wallet/init", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const initData = await initRes.json();
-
-      if (!initRes.ok) {
-        throw new Error(initData.error || "Failed to initialize wallet");
-      }
-
-      // Check if user already has a wallet (challengeId is null for existing users)
-      if (!initData.challengeId) {
-        // User already has a wallet, get the address and redirect
-        toast({
-          title: "Retrieving wallet address...",
-          description: "Getting your existing wallet information.",
-        });
-
-        const addressRes = await fetch("/api/wallet/address", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
-        });
-        const addressData = await addressRes.json();
-
-        if (!addressRes.ok) {
-          throw new Error(addressData.error || "Failed to get wallet address");
-        }
-
-        setPinLoading(false);
-        setIsLoading(false);
-        toast({
-          title: "Account Type Selected!",
-          description: "Redirecting to account setup...",
-        });
-
-        // Redirect to appropriate onboarding page with wallet info
-        const onboardingRoute =
-          selectedType === "pharmacy"
-            ? "/onboarding/pharmacy"
-            : selectedType === "doctor"
-            ? "/onboarding/doctor"
-            : selectedType === "admin"
-            ? "/onboarding/admin"
-            : "/onboarding";
-
-        router.push(
-          `${onboardingRoute}?type=${selectedType}&email=${encodeURIComponent(
-            email
-          )}&wallet=${encodeURIComponent(addressData.walletAddress)}`
-        );
-        return;
-      }
-
-      // Step 2: PIN setup with Circle SDK for new users
-      setPinLoading(true);
-      toast({
-        title: "Setting up wallet PIN...",
-        description: "Please follow the PIN setup instructions in the popup.",
-      });
-
-      web3Services.setAuthentication({
-        userToken: initData.userToken,
-        encryptionKey: initData.encryptionKey,
-      });
-      web3Services.execute(
-        initData.challengeId,
-        async (
-          error: CircleError | undefined,
-          result:
-            | ChallengeResult
-            | SignMessageResult
-            | SignTransactionResult
-            | undefined
-        ) => {
-          if (error) {
-            if (error.code === 155706) {
-              toast({
-                title: "Network hiccup",
-                description:
-                  "If the PIN UI does not appear, please check your connection and try again.",
-              });
-              // Do NOT set pinLoading/isLoading to false; wait for user to complete PIN UI
-              return;
-            }
-            setPinLoading(false);
-            setIsLoading(false);
-            let errMsg = "";
-            if (error instanceof Error) {
-              errMsg = error.message;
-            } else if (typeof error === "string") {
-              errMsg = error;
-            } else {
-              errMsg = JSON.stringify(error);
-            }
-            toast({
-              variant: "destructive",
-              title: "PIN Setup Failed",
-              description:
-                errMsg ||
-                "There was an error setting your wallet PIN. Please try again.",
-            });
-            return;
-          }
-          if (result) {
-            // Step 3: Get wallet address after PIN setup
-            toast({
-              title: "Retrieving wallet address...",
-              description: "Getting your new wallet information.",
-            });
-
-            try {
-              const addressRes = await fetch("/api/wallet/address", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email }),
-              });
-              const addressData = await addressRes.json();
-
-              if (!addressRes.ok) {
-                throw new Error(
-                  addressData.error || "Failed to get wallet address"
-                );
-              }
-
-              setPinLoading(false);
-              setIsLoading(false);
-              toast({
-                title: "Account Type Selected!",
-                description: "Redirecting to account setup...",
-              });
-
-              // Redirect to appropriate onboarding page with wallet info
-              const onboardingRoute =
-                selectedType === "pharmacy"
-                  ? "/onboarding/pharmacy"
-                  : selectedType === "doctor"
-                  ? "/onboarding/doctor"
-                  : selectedType === "admin"
-                  ? "/onboarding/admin"
-                  : "/onboarding";
-
-              router.push(
-                `${onboardingRoute}?type=${selectedType}&email=${encodeURIComponent(
-                  email
-                )}&wallet=${encodeURIComponent(addressData.walletAddress)}`
-              );
-            } catch (addressError) {
-              setPinLoading(false);
-              setIsLoading(false);
-              toast({
-                variant: "destructive",
-                title: "Wallet Setup Complete",
-                description: `PIN setup successful, but there was an issue retrieving your wallet address. Please contact support. ${addressError instanceof Error ? addressError.message : JSON.stringify(addressError)}`,
-              });
-            }
-          }
-        }
-      );
-    } catch (error: unknown) {
-      toast({
+        title: "Error",
+        description: "An error occurred. Please try again.",
         variant: "destructive",
-        title: "Something went wrong",
-        description: `Wallet setup failed. Please try again or contact support. ${
-          error instanceof Error ? error.message : JSON.stringify(error)
-        }`,
       });
+    } finally {
       setIsLoading(false);
     }
   };
@@ -319,6 +179,32 @@ export default function AccountTypeSelectionPage() {
           </Button>
         </Link>
       </motion.div>
+
+      {/* Connect Wallet Button */}
+      <div className="fixed top-4 right-4 z-50">
+        {isConnected && walletAddress ? (
+          <Button
+            onClick={handleDisconnect}
+            variant="outline"
+            size="sm"
+            className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-200 dark:hover:border-red-700"
+          >
+            {walletAddress.slice(0, 4)}...{walletAddress.slice(-4)}
+            <span className="ml-2 text-xs text-red-600 dark:text-red-400">
+              Disconnect
+            </span>
+          </Button>
+        ) : (
+          <Button
+            onClick={handleConnectWallet}
+            variant="outline"
+            size="sm"
+            className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800"
+          >
+            Connect Wallet
+          </Button>
+        )}
+      </div>
 
       <div className="flex items-center justify-center min-h-screen p-4 relative z-10">
         <div className="w-full max-w-4xl">
@@ -438,11 +324,11 @@ export default function AccountTypeSelectionPage() {
             >
               <Button
                 onClick={handleContinue}
-                disabled={!selectedType || isLoading || pinLoading}
+                disabled={!selectedType || isLoading}
                 size="lg"
                 className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white px-8"
               >
-                {isLoading || pinLoading ? (
+                {isLoading ? (
                   "Setting up..."
                 ) : (
                   <>
@@ -464,16 +350,6 @@ export default function AccountTypeSelectionPage() {
           </motion.div>
         </div>
       </div>
-      {pinLoading && (
-        <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-900 rounded-lg p-8 flex flex-col items-center">
-            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="text-lg font-semibold text-gray-900 dark:text-white">
-              Setting up your wallet PIN...
-            </p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

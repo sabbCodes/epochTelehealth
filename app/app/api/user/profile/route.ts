@@ -33,10 +33,6 @@ interface FormData {
   isVerified?: string | boolean;
   profileImage?: string | null;
   occupation?: string;
-  tribe?: string;
-  maritalStatus?: string;
-  emergencyContact?: string;
-  emergencyContactPhone?: string;
   medicalHistory?: string;
   pharmacyImages?: Array<{ url: string; name?: string }>;
 }
@@ -584,20 +580,8 @@ export async function POST(request: Request) {
           wallet_address: profileData.walletAddress, // Add wallet address to patient profile
           first_name: profileData.firstName,
           last_name: profileData.lastName,
-          phone: profileData.phone,
-          country: profileData.country,
-          city: profileData.city,
-          address: profileData.address,
           date_of_birth: profileData.dateOfBirth,
           gender: profileData.gender,
-          occupation: profileData.occupation,
-          tribe: profileData.tribe,
-          marital_status: profileData.maritalStatus,
-          emergency_contact: profileData.emergencyContact,
-          emergency_contact_phone: profileData.emergencyContactPhone,
-          medical_history: profileData.medicalHistory,
-          allergies: profileData.allergies,
-          current_medications: profileData.currentMedications,
           profile_image: profileData.profileImage,
           updated_at: new Date().toISOString(),
           ...(!existingUser && { created_at: new Date().toISOString() }),

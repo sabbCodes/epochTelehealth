@@ -1,34 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { W3sProvider } from "@/providers/W3sProvider";
-import { SolanaProvider } from "@/providers/SolanaProvider";
-import { WherebyProvider } from "@whereby.com/browser-sdk/react";
+import dynamic from "next/dynamic";
+import type { ReactNode } from "react";
 
-export default function ClientLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const router = useRouter();
-  useEffect(() => {
-    if (
-      typeof window !== "undefined" &&
-      window.location.hash.startsWith("#access_token")
-    ) {
-      const hash = window.location.hash.substring(1);
-      const params = new URLSearchParams(hash);
-      router.replace(`/signin?${params.toString()}`);
-    }
-  }, [router]);
-  return (
-    <W3sProvider>
-      <SolanaProvider>
-        <WherebyProvider>
-          {children}
-        </WherebyProvider>
-      </SolanaProvider>
-    </W3sProvider>
-  );
+const ClientLayoutContent = dynamic(() => import("./ClientLayoutContent"), {
+  ssr: false,
+  loading: () => null,
+}) as React.ComponentType<{ children: ReactNode }>;
+
+export default function ClientLayout({ children }: { children: ReactNode }) {
+  return <ClientLayoutContent>{children}</ClientLayoutContent>;
 }

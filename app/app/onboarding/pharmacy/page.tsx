@@ -9,7 +9,6 @@ import {
   ArrowLeft,
   Pill,
   Building,
-  // Mail,
   CheckCircle,
   Shield,
   Clock,
@@ -56,7 +55,7 @@ export default function PharmacyOnboardingPage() {
   const router = useRouter();
   const { toast } = useToast();
   const email = searchParams?.get("email") || "";
-  const walletAddress = searchParams?.get("wallet") || "";
+  const walletAddress = searchParams?.get("walletAddress") || "";
 
   interface OperatingHoursDay {
     open: string;

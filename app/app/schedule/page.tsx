@@ -25,180 +25,47 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { DoctorProfile, fetchDoctorById } from "@/lib/doctors";
 import { createSchedule } from "@/lib/schedules";
-import { useW3s } from "@/providers/W3sProvider";
+import DoctorProfileSkeleton from "@/components/doctorprofileskeleton";
+import { TelehealthsolEscrow } from "@/utils/telehealthsol_escrow";
+import idl from "@/utils/telehealthsol_escrow.json";
+import {
+  PublicKey,
+  Connection,
+  SystemProgram,
+  Transaction,
+  LAMPORTS_PER_SOL,
+} from "@solana/web3.js";
+import { BN, Program } from "@coral-xyz/anchor";
+import {
+  getAssociatedTokenAddressSync,
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID
+} from "@solana/spl-token";
+import {
+  usePhantom,
+  useModal,
+  useAccounts,
+  useSolana,
+} from "@phantom/react-sdk";
 
-function DoctorProfileSkeleton() {
-  return (
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="mb-6">
-        <Skeleton className="h-10 w-24" />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-            <Skeleton className="h-6 w-48 mb-6" />
-            <div className="flex items-start space-x-4">
-              <Skeleton className="w-20 h-20 rounded-full" />
-              <div className="flex-1 space-y-3">
-                <div className="flex items-center space-x-2">
-                  <Skeleton className="h-6 w-48" />
-                  <Skeleton className="h-5 w-16" />
-                </div>
-                <Skeleton className="h-5 w-36" />
-                <div className="flex flex-wrap gap-4">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-4 w-20" />
-                </div>
-                <Skeleton className="h-12 w-full" />
-
-                <div className="pt-2">
-                  <div className="flex items-center mb-2">
-                    <Skeleton className="w-4 h-4 mr-2" />
-                    <Skeleton className="h-4 w-36" />
-                  </div>
-                  <div className="ml-6 space-y-2">
-                    {[1, 2].map((i) => (
-                      <div key={i} className="flex items-start">
-                        <Skeleton className="w-2 h-2 mt-1.5 mr-2" />
-                        <Skeleton className="h-4 w-64" />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="pt-2">
-                  <div className="flex items-center">
-                    <Skeleton className="w-4 h-4 mr-2" />
-                    <Skeleton className="h-4 w-36" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-            <Skeleton className="h-6 w-48 mb-6" />
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="border rounded-lg p-4">
-                  <div className="flex items-center space-x-3 mb-2">
-                    <Skeleton className="w-5 h-5 rounded-full" />
-                    <Skeleton className="h-5 w-24" />
-                  </div>
-                  <Skeleton className="h-4 w-full mb-1" />
-                  <Skeleton className="h-3 w-20" />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-            <Skeleton className="h-6 w-48 mb-6" />
-
-            <Skeleton className="h-5 w-32 mb-3" />
-            <div className="grid grid-cols-3 sm:grid-cols-7 gap-2 mb-6">
-              {[1, 2, 3, 4, 5, 6, 7].map((i) => (
-                <Skeleton key={i} className="h-16 rounded-md" />
-              ))}
-            </div>
-
-            <Skeleton className="h-5 w-32 mb-3" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-60 overflow-y-auto p-2">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <Skeleton key={i} className="h-10 rounded" />
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-            <Skeleton className="h-6 w-48 mb-4" />
-            <Skeleton className="h-24 w-full rounded-md" />
-            <Skeleton className="h-4 w-64 mt-2" />
-          </div>
-        </div>
-
-        <div className="space-y-6">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700 p-6">
-            <div className="flex items-center mb-6">
-              <Skeleton className="h-6 w-6 mr-2" />
-              <Skeleton className="h-6 w-32" />
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex justify-between">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-32" />
-              </div>
-
-              <div className="flex justify-between">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-24" />
-              </div>
-
-              <div className="flex justify-between">
-                <Skeleton className="h-4 w-12" />
-                <Skeleton className="h-4 w-20" />
-              </div>
-
-              <div className="flex justify-between">
-                <Skeleton className="h-4 w-12" />
-                <Skeleton className="h-4 w-16" />
-              </div>
-
-              <div className="flex justify-between">
-                <Skeleton className="h-4 w-16" />
-                <Skeleton className="h-4 w-24" />
-              </div>
-
-              <Separator className="my-3" />
-
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-20" />
-                </div>
-                <div className="flex justify-between">
-                  <Skeleton className="h-4 w-24" />
-                  <Skeleton className="h-4 w-16" />
-                </div>
-
-                <Separator className="my-2" />
-
-                <div className="flex justify-between font-bold">
-                  <Skeleton className="h-5 w-16" />
-                  <Skeleton className="h-5 w-20" />
-                </div>
-
-                <Skeleton className="h-3 w-full mt-1" />
-              </div>
-
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mt-4">
-                <div className="flex items-center mb-1">
-                  <Skeleton className="w-4 h-4 mr-2" />
-                  <Skeleton className="h-4 w-24" />
-                </div>
-                <Skeleton className="h-3 w-48" />
-              </div>
-
-              <Skeleton className="h-10 w-full mt-4 rounded-md" />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+const idl_string = JSON.stringify(idl);
+const idl_object = JSON.parse(idl_string);
+const programID = new PublicKey(idl.address);
 
 export default function SchedulePage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
+
+  // Phantom wallet hooks
+  const { isConnected } = usePhantom();
+  const { open } = useModal();
+  const addresses = useAccounts();
+  const { solana } = useSolana();
+
   const doctorId = searchParams?.get("doctorId");
   const [doctor, setDoctor] = useState<DoctorProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -217,9 +84,6 @@ export default function SchedulePage() {
     duration: number;
     icon: React.ComponentType<{ className?: string }>;
   } | null>(null);
-
-  // Circle Web SDK for authorizing user-controlled challenges
-  const web3Services = useW3s();
 
   useEffect(() => {
     const loadDoctor = async () => {
@@ -427,8 +291,6 @@ export default function SchedulePage() {
         throw new Error("Please select both date and time");
       }
 
-      console.log("Raw selected date:", selectedDate, "time:", selectedTime);
-
       // Get patient profile with user data
       const { data: patientData, error: patientProfileError } = await supabase
         .from("patient_profiles")
@@ -454,10 +316,7 @@ export default function SchedulePage() {
         user_profile_id: patientData.user_profile_id,
         first_name: patientData.first_name,
         last_name: patientData.last_name,
-        email: patientData.user_profiles?.email,
       };
-
-      console.log("Patient profile found:", patientProfile);
 
       // 3. Parse the selected date (format: '5 Sep')
       const now = new Date();
@@ -511,8 +370,6 @@ export default function SchedulePage() {
         }
       }
 
-      console.log("Parsed date:", startTime.toString());
-
       // Format for Supabase (YYYY-MM-DD and HH:MM:SS)
       const formatTwoDigits = (num: number) => num.toString().padStart(2, "0");
       const scheduledDate = `${startTime.getFullYear()}-${formatTwoDigits(
@@ -529,16 +386,6 @@ export default function SchedulePage() {
       const endTimeStr = `${formatTwoDigits(
         endTime.getHours()
       )}:${formatTwoDigits(endTime.getMinutes())}:00`;
-
-      console.log("Booking details:", {
-        doctor_id: doctor?.id,
-        patient_id: patientProfile.user_profile_id,
-        scheduled_date: scheduledDate,
-        start_time: startTimeStr,
-        end_time: endTimeStr,
-        consultation_type: selectedType.id,
-        notes: symptoms || null,
-      });
 
       // Check for existing schedule first
       const { data: existingSchedule, error: checkError } = await supabase
@@ -561,7 +408,7 @@ export default function SchedulePage() {
         throw new Error("Error checking availability. Please try again.");
       }
 
-      // Perform payment (patient -> doctor) using Circle user-controlled transfer
+      // Perform payment using Solana escrow program
       const doctorWallet: string | undefined =
         doctor.wallet_address || undefined;
       if (!doctorWallet) {
@@ -573,75 +420,190 @@ export default function SchedulePage() {
         );
       }
 
-      // Initiate transfer via our API to get challengeId
-      const transferRes = await fetch("/api/payments/ucw-transfer", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          amount: String(totalAmount),
-          destinationAddress: doctorWallet,
-          email: user.email,
-          feeLevel: "MEDIUM",
-        }),
-      });
-      const transferData = await transferRes.json();
-      if (!transferRes.ok) {
-        throw new Error(transferData?.error || "Failed to initiate payment");
-      }
-
-      const {
-        challengeId,
-        userToken: circleUserToken,
-        encryptionKey,
-      } = transferData as {
-        challengeId: string;
-        userToken: string;
-        encryptionKey?: string;
-      };
-      if (!challengeId || !circleUserToken) {
-        throw new Error("Invalid payment session.");
-      }
-
-      // Authorize the challenge with Circle Web SDK (PIN/biometric)
-      toast({
-        title: "Authorize Payment",
-        description: "Confirm the payment in the next prompt.",
-      });
-      web3Services.setAuthentication({
-        userToken: circleUserToken,
-        encryptionKey,
-      });
-      await new Promise<void>((resolve, reject) => {
-        web3Services.execute(challengeId, (error) => {
-          if (error) {
-            // Handle known benign hiccup: 155706 or generic network error while UI still succeeds
-            const code = (error as any)?.code;
-            const msg =
-              typeof error === "object" && error && "message" in (error as any)
-                ? ((error as any).message as string)
-                : String(error);
-            // If it's the known transient 155706, keep waiting for the user to complete the UI
-            if (code === 155706) {
-              // do not resolve or reject; the SDK will invoke callback again when user finishes
-              return;
-            }
-            // Any other error is fatal here to avoid proceeding before auth completes
-            reject(new Error(msg || "Payment authorization failed"));
-            return;
-          }
-          resolve();
+      // Check wallet connection
+      if (!isConnected || !addresses || addresses.length === 0) {
+        toast({
+          title: "Wallet Required",
+          description: "Please connect your wallet to proceed with payment.",
+          variant: "destructive",
         });
+        open();
+        return;
+      }
+
+      const patientWallet = addresses[0].address;
+
+      // Create Solana connection
+      // const connection = new Connection(
+      //   "https://mainnet.helius-rpc.com/?api-key=0956b94b-51c1-4add-a9d0-37ed87d401d6",
+      //   "confirmed"
+      // );
+
+      const connection = new Connection(
+        "https://devnet.helius-rpc.com/?api-key=0956b94b-51c1-4add-a9d0-37ed87d401d6",
+        "confirmed"
+      );
+
+      // Create program instance without AnchorProvider (we'll build transactions manually)
+      // const program = new Program<TelehealthsolEscrow>(idl_object, programID);
+
+      // Convert consultation date to seed (using timestamp)
+      // const consultationDateTime = new Date(`${selectedDate}T${selectedTime}`);
+      // const seed = new BN(startTime.getTime());
+
+      // Convert amount to lamports (assuming USDC with 6 decimals)
+      // const sessionAmount = new BN(totalAmount * 1_000_000); // Convert to smallest unit
+
+      // Derive escrow PDA
+      // const [escrow] = PublicKey.findProgramAddressSync(
+      //   [
+      //     Buffer.from("session"),
+      //     new PublicKey(patientWallet).toBuffer(),
+      //     seed.toArrayLike(Buffer, "le", 8),
+      //   ],
+      //   program.programId
+      // );
+
+      // Derive vault ATA (this will be created by the program)
+      // const vault = getAssociatedTokenAddressSync(
+      //   new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"),
+      //   escrow,
+      //   true,
+      //   TOKEN_PROGRAM_ID,
+      //   ASSOCIATED_TOKEN_PROGRAM_ID
+      // );
+
+      // Get patient ATA
+      // const patientAta = getAssociatedTokenAddressSync(
+      //   new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"),
+      //   new PublicKey(patientWallet),
+      //   false,
+      //   TOKEN_PROGRAM_ID,
+      //   ASSOCIATED_TOKEN_PROGRAM_ID
+      // );
+
+      // Platform wallet
+      // const platformWallet = new PublicKey(
+      //   "EpochDhSxSmkmtSA2tZjGW8JCUV8QBWTmkigKskvkv6V"
+      // );
+
+      // Check if patient ATA exists and has sufficient balance
+      // const patientAtaInfo = await connection.getAccountInfo(patientAta);
+
+      // if (!patientAtaInfo) {
+      //   toast({
+      //     title: "USDC Account Required",
+      //     description:
+      //       "You need to create a USDC account in your wallet first. Please get some USDC tokens to proceed.",
+      //     variant: "destructive",
+      //   });
+      //   return;
+      // }
+
+      // Check USDC balance
+      // const tokenBalance = await connection.getTokenAccountBalance(patientAta);
+      // const requiredAmount = totalAmount * 1_000_000; // Convert to smallest unit
+
+      // if (Number(tokenBalance.value.amount) < requiredAmount) {
+      //   toast({
+      //     title: "Insufficient USDC Balance",
+      //     description: `You need ${totalAmount} USDC but only have ${Number(
+      //       tokenBalance.value.uiAmount || 0
+      //     ).toFixed(2)} USDC.`,
+      //     variant: "destructive",
+      //   });
+      //   return;
+      // }
+
+      // toast({
+      //   title: "Processing Payment",
+      //   description: "Setting up network and approving transaction...",
+      // });
+
+      // Ensure wallet is on devnet
+      try {
+        await solana.switchNetwork("devnet");
+      } catch (error) {
+        console.warn("Failed to switch network:", error);
+      }
+
+      // First, test with a simple SOL transfer to verify connection works
+      toast({
+        title: "Testing Connection",
+        description: "Sending test transaction...",
       });
+
+      try {
+        const testTransaction = new Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: new PublicKey(patientWallet),
+            toPubkey: new PublicKey(
+              "EpochDhSxSmkmtSA2tZjGW8JCUV8QBWTmkigKskvkv6V"
+            ),
+            lamports: 0.01 * LAMPORTS_PER_SOL, // 0.01 SOL
+          })
+        );
+
+        // Set recent blockhash and fee payer
+        const { blockhash } = await connection.getLatestBlockhash("confirmed");
+        testTransaction.recentBlockhash = blockhash;
+        testTransaction.feePayer = new PublicKey(patientWallet);
+
+        // Send test transaction
+        const testResult = await solana.signAndSendTransaction(testTransaction);
+        console.log("Test transaction successful:", testResult.signature);
+
+        toast({
+          title: "Connection Test Successful",
+          description: "Proceeding with booking...",
+        });
+      } catch (testError) {
+        console.error("Test transaction failed:", testError);
+        toast({
+          title: "Connection Test Failed",
+          description: `Unable to process payment: ${testError instanceof Error ? testError.message : 'Unknown error'}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Start the session (fund escrow)
+      // const transaction = await program.methods
+      //   .startSession(seed, sessionAmount)
+      //   .accounts({
+      //     patient: new PublicKey(patientWallet),
+      //     platform: platformWallet,
+      //     escrow,
+      //     mint: new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"),
+      //     patientAta,
+      //     vault,
+      //     associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      //     tokenProgram: TOKEN_PROGRAM_ID,
+      //     systemProgram: SystemProgram.programId,
+      //   })
+      //   .transaction();
+
+      // Set recent blockhash and fee payer
+      // const { blockhash } = await connection.getLatestBlockhash("confirmed");
+      // transaction.recentBlockhash = blockhash;
+      // transaction.feePayer = new PublicKey(patientWallet);
+
+      // Sign and send transaction using Phantom
+      // const startSessionTx = await solana.signAndSendTransaction(transaction);
+
+      // console.log("Session started with tx:", startSessionTx.signature);
+
+      // toast({
+      //   title: "Payment Successful",
+      //   description: "Your consultation has been funded in escrow.",
+      // });
 
       // If we reach here, payment was authorized.
       // Create the Whereby room FIRST, before creating the schedule (only for video consultations)
       let roomUrl: string | null = null;
       let meetingId: string | null = null;
 
-      if (
-        selectedType.id === "video" ||
-        selectedType.id === "extended_video"
-      ) {
+      if (selectedType.id === "video" || selectedType.id === "extended_video") {
         setIsCreatingRoom(true);
 
         try {
@@ -674,7 +636,7 @@ export default function SchedulePage() {
       }
 
       try {
-        // Now create the schedule WITH the room info included (if applicable)
+        // Now create the schedule WITH the room info and escrow info included
         const scheduleData = await createSchedule({
           doctor_id: doctor?.id || "",
           patient_id: patientProfile.id,
@@ -733,7 +695,7 @@ export default function SchedulePage() {
         console.log("Found doctor email via function:", doctorEmail);
 
         // Get patient's email from user_profiles if not already in patientProfile
-        const patientEmail = patientProfile.email || user.email;
+        const patientEmail = user.email;
         if (!patientEmail) {
           throw new Error("Patient email not found");
         }

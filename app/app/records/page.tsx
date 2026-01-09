@@ -21,8 +21,6 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import {
   Program,
   AnchorProvider,
-  web3,
-  BN,
   setProvider,
 } from "@coral-xyz/anchor";
 import { EpochTelehealth } from "@/components/epoch_telehealth";

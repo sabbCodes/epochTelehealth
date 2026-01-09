@@ -30,7 +30,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
-import { useW3s } from "@/providers/W3sProvider";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,7 +45,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-// Separator import removed as it's not used
 
 interface Appointment {
   id: string;
@@ -97,7 +95,6 @@ export default function DoctorDashboard() {
   const [selectedPatient, setSelectedPatient] = useState<PatientDetails | null>(null);
   const { toast } = useToast();
   const router = useRouter();
-  const web3Services = useW3s();
 
   useEffect(() => {
     const fetchWalletBalance = async () => {
@@ -589,106 +586,6 @@ export default function DoctorDashboard() {
                 Cancel
               </Button>
               <Button
-                onClick={async () => {
-                  if (!doctorProfile?.email) {
-                    toast({
-                      title: "Missing email",
-                      description:
-                        "Your account email is required to withdraw.",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-                  const amt = parseFloat(withdrawAmount);
-                  if (!amt || amt <= 0) {
-                    toast({
-                      title: "Invalid amount",
-                      description: "Enter a valid USDC amount.",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-                  if (!withdrawAddress || withdrawAddress.length < 32) {
-                    toast({
-                      title: "Invalid address",
-                      description: "Enter a valid Solana address.",
-                      variant: "destructive",
-                    });
-                    return;
-                  }
-                  setWithdrawing(true);
-                  try {
-                    // Initiate transfer from doctor (user-controlled)
-                    const res = await fetch("/api/payments/ucw-transfer", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        amount: String(amt),
-                        destinationAddress: withdrawAddress,
-                        email: doctorProfile.email,
-                        feeLevel: "MEDIUM",
-                      }),
-                    });
-                    const data = await res.json();
-                    if (!res.ok) {
-                      throw new Error(
-                        data?.error || "Failed to initiate withdrawal"
-                      );
-                    }
-                    const { challengeId, userToken, encryptionKey } = data as {
-                      challengeId: string;
-                      userToken: string;
-                      encryptionKey?: string;
-                    };
-                    if (!challengeId || !userToken) {
-                      throw new Error("Invalid withdrawal session");
-                    }
-                    toast({
-                      title: "Authorize Withdrawal",
-                      description: "Confirm in the next prompt.",
-                    });
-                    web3Services.setAuthentication({
-                      userToken,
-                      encryptionKey,
-                    });
-                    await new Promise<void>((resolve, reject) => {
-                      web3Services.execute(challengeId, (error) => {
-                        if (error) {
-                          const code = (error as any)?.code;
-                          const msg =
-                            typeof error === "object" &&
-                            error &&
-                            "message" in (error as any)
-                              ? ((error as any).message as string)
-                              : String(error);
-                          if (code === 155706) {
-                            return; // wait for final callback
-                          }
-                          reject(new Error(msg || "Authorization failed"));
-                          return;
-                        }
-                        resolve();
-                      });
-                    });
-                    toast({
-                      title: "Withdrawal initiated",
-                      description: "Funds are on the way.",
-                    });
-                    setWithdrawOpen(false);
-                  } catch (err) {
-                    console.error("Withdraw error:", err);
-                    toast({
-                      title: "Withdrawal failed",
-                      description:
-                        err instanceof Error
-                          ? err.message
-                          : "Please try again.",
-                      variant: "destructive",
-                    });
-                  } finally {
-                    setWithdrawing(false);
-                  }
-                }}
                 disabled={withdrawing}
               >
                 {withdrawing ? "Processing..." : "Withdraw"}

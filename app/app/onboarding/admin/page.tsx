@@ -25,7 +25,7 @@ export default function AdminOnboardingPage() {
   const { toast } = useToast();
 
   const email = searchParams.get("email") || "";
-  const walletAddress = searchParams.get("wallet") || "";
+  const walletAddress = searchParams.get("walletAddress") || "";
 
   const [formData, setFormData] = useState({
     firstName: "",

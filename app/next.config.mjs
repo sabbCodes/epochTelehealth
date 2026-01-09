@@ -10,9 +10,9 @@ const nextConfig = {
     unoptimized: true,
   },
   // Disable static generation for pages that use client-side libraries
-  experimental: {
-    missingSuspenseWithCSRError: false,
-  },
+  // experimental: {
+  //   missingSuspenseWithCSRError: false,
+  // },
 };
 
 export default nextConfig;
