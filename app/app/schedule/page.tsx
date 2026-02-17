@@ -409,29 +409,29 @@ export default function SchedulePage() {
       }
 
       // Perform payment using Solana escrow program
-      const doctorWallet: string | undefined =
-        doctor.wallet_address || undefined;
-      if (!doctorWallet) {
-        throw new Error("Doctor payment address is not configured.");
-      }
-      if (!user?.email) {
-        throw new Error(
-          "Your account does not have an email set. Please re-login."
-        );
-      }
+      // const doctorWallet: string | undefined =
+      //   doctor.wallet_address || undefined;
+      // if (!doctorWallet) {
+      //   throw new Error("Doctor payment address is not configured.");
+      // }
+      // if (!user?.email) {
+      //   throw new Error(
+      //     "Your account does not have an email set. Please re-login."
+      //   );
+      // }
 
       // Check wallet connection
-      if (!isConnected || !addresses || addresses.length === 0) {
-        toast({
-          title: "Wallet Required",
-          description: "Please connect your wallet to proceed with payment.",
-          variant: "destructive",
-        });
-        open();
-        return;
-      }
+      // if (!isConnected || !addresses || addresses.length === 0) {
+      //   toast({
+      //     title: "Wallet Required",
+      //     description: "Please connect your wallet to proceed with payment.",
+      //     variant: "destructive",
+      //   });
+      //   open();
+      //   return;
+      // }
 
-      const patientWallet = addresses[0].address;
+      // const patientWallet = addresses[0].address;
 
       // Create Solana connection
       // const connection = new Connection(
@@ -439,10 +439,10 @@ export default function SchedulePage() {
       //   "confirmed"
       // );
 
-      const connection = new Connection(
-        "https://devnet.helius-rpc.com/?api-key=0956b94b-51c1-4add-a9d0-37ed87d401d6",
-        "confirmed"
-      );
+      // const connection = new Connection(
+      //   "https://devnet.helius-rpc.com/?api-key=0956b94b-51c1-4add-a9d0-37ed87d401d6",
+      //   "confirmed"
+      // );
 
       // Create program instance without AnchorProvider (we'll build transactions manually)
       // const program = new Program<TelehealthsolEscrow>(idl_object, programID);
@@ -521,51 +521,51 @@ export default function SchedulePage() {
       // });
 
       // Ensure wallet is on devnet
-      try {
-        await solana.switchNetwork("devnet");
-      } catch (error) {
-        console.warn("Failed to switch network:", error);
-      }
+      // try {
+      //   await solana.switchNetwork("devnet");
+      // } catch (error) {
+      //   console.warn("Failed to switch network:", error);
+      // }
 
-      // First, test with a simple SOL transfer to verify connection works
-      toast({
-        title: "Testing Connection",
-        description: "Sending test transaction...",
-      });
+      // // First, test with a simple SOL transfer to verify connection works
+      // toast({
+      //   title: "Testing Connection",
+      //   description: "Sending test transaction...",
+      // });
 
-      try {
-        const testTransaction = new Transaction().add(
-          SystemProgram.transfer({
-            fromPubkey: new PublicKey(patientWallet),
-            toPubkey: new PublicKey(
-              "EpochDhSxSmkmtSA2tZjGW8JCUV8QBWTmkigKskvkv6V"
-            ),
-            lamports: 0.01 * LAMPORTS_PER_SOL, // 0.01 SOL
-          })
-        );
+      // try {
+      //   const testTransaction = new Transaction().add(
+      //     SystemProgram.transfer({
+      //       fromPubkey: new PublicKey(patientWallet),
+      //       toPubkey: new PublicKey(
+      //         "EpochDhSxSmkmtSA2tZjGW8JCUV8QBWTmkigKskvkv6V"
+      //       ),
+      //       lamports: 0.01 * LAMPORTS_PER_SOL, // 0.01 SOL
+      //     })
+      //   );
 
-        // Set recent blockhash and fee payer
-        const { blockhash } = await connection.getLatestBlockhash("confirmed");
-        testTransaction.recentBlockhash = blockhash;
-        testTransaction.feePayer = new PublicKey(patientWallet);
+      //   // Set recent blockhash and fee payer
+      //   const { blockhash } = await connection.getLatestBlockhash("confirmed");
+      //   testTransaction.recentBlockhash = blockhash;
+      //   testTransaction.feePayer = new PublicKey(patientWallet);
 
-        // Send test transaction
-        const testResult = await solana.signAndSendTransaction(testTransaction);
-        console.log("Test transaction successful:", testResult.signature);
+      //   // Send test transaction
+      //   const testResult = await solana.signAndSendTransaction(testTransaction);
+      //   console.log("Test transaction successful:", testResult.signature);
 
-        toast({
-          title: "Connection Test Successful",
-          description: "Proceeding with booking...",
-        });
-      } catch (testError) {
-        console.error("Test transaction failed:", testError);
-        toast({
-          title: "Connection Test Failed",
-          description: `Unable to process payment: ${testError instanceof Error ? testError.message : 'Unknown error'}`,
-          variant: "destructive",
-        });
-        return;
-      }
+      //   toast({
+      //     title: "Connection Test Successful",
+      //     description: "Proceeding with booking...",
+      //   });
+      // } catch (testError) {
+      //   console.error("Test transaction failed:", testError);
+      //   toast({
+      //     title: "Connection Test Failed",
+      //     description: `Unable to process payment: ${testError instanceof Error ? testError.message : 'Unknown error'}`,
+      //     variant: "destructive",
+      //   });
+      //   return;
+      // }
 
       // Start the session (fund escrow)
       // const transaction = await program.methods

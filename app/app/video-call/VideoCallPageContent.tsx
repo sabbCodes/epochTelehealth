@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
-import { useLocalMedia } from "@whereby.com/browser-sdk/react";
 import { WherebyVideoCall } from "./WherebyVideoCall";
 import { useUserProfile } from "@/hooks/useUserProfile";
 import { supabase } from "@/lib/supabase";
@@ -19,13 +18,6 @@ export default function VideoCallPageContent() {
   const [localUser, setLocalUser] = useState<any>(null);
   const [remoteUser, setRemoteUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [isVideoOn, setIsVideoOn] = useState(true);
-  const [isAudioOn, setIsAudioOn] = useState(true);
-
-  const localMedia = useLocalMedia({
-    video: isVideoOn,
-    audio: isAudioOn,
-  });
 
   const { userProfile: currentUser } = useUserProfile();
   const { toast } = useToast();
@@ -198,7 +190,6 @@ export default function VideoCallPageContent() {
       localUser={localUser}
       remoteUser={remoteUser}
       role={roleParam}
-      localMedia={localMedia}
     />
   );
 }

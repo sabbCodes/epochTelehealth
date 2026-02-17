@@ -1,7 +1,6 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { ReactNode } from "react";
 
 const VideoCallPageContent = dynamic(
   () => import("./VideoCallPageContent"),

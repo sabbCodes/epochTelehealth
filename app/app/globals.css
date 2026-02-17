@@ -259,3 +259,12 @@
     transform: rotate(360deg);
   }
 }
+
+/* Glassmorphism effect for video call UI */
+.glass-effect {
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(148, 163, 184, 0.1);
+}
+
