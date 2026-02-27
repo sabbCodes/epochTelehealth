@@ -91,6 +91,28 @@ export class AuthService {
     }
   }
 
+  // Send password reset email
+  static async resetPassword(email: string) {
+    try {
+      const redirectTo =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/reset-password`
+          : undefined;
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo,
+      });
+
+      if (error) throw error;
+      return { error: null };
+    } catch (error) {
+      return {
+        error: error instanceof Error ? error.message : "Failed to send reset email",
+      };
+    }
+  }
+
+
   // Get current user
   static async getCurrentUser() {
     try {

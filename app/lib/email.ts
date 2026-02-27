@@ -38,7 +38,7 @@ export async function sendAppointmentConfirmation(
     const emailComponent = AppointmentEmail({ appointment });
 
     const emailData: EmailData = {
-      from: "Sabb | epochTeleHealth <noreply@epochtelehealth.com>",
+      from: "Sabb | Epoch telehealth <noreply@epochtelehealth.com>",
       to: to,
       subject: `Appointment ${appointment.recipientType === "patient" ? "Confirmed" : "Scheduled"}: Dr. ${appointment.doctorName}`,
       react: emailComponent,

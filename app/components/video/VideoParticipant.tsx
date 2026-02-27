@@ -111,7 +111,7 @@ export const VideoParticipant: React.FC<VideoParticipantProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Overlays - Hide if local and audio is enabled (nothing to show) - Actually USER REQUESTED TO SHOW IT */}
+      {/* Overlays - Hide if local and audio is enabled (nothing to show)*/}
       <div className="absolute bottom-4 left-4 flex items-center gap-2 pointer-events-none">
         <div className="px-3 py-1.5 glass-effect rounded-full flex items-center gap-2">
           {!isAudioEnabled && (

@@ -50,7 +50,7 @@ export default function ClientLayoutContent({
       }}
       theme={theme}
       appIcon="/telehealthlogo.svg"
-      appName="epochTeleHealth"
+      appName=""
     >
       <SolanaProvider>
         <WherebyProvider>{children}</WherebyProvider>

@@ -12,8 +12,14 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["Poppins", "sans-serif"],
+        display: ["Poppins", "sans-serif"],
+        heading: ["Poppins", "sans-serif"],
       },
       colors: {
+        brand: {
+          primary: "#004DFF",
+          pale: "#CCDBFF",
+        },
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
         card: {
@@ -70,6 +76,9 @@ const config: Config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      maxWidth: {
+        container: "1280px",
+      },
       keyframes: {
         "accordion-down": {
           from: {
@@ -87,10 +96,15 @@ const config: Config = {
             height: "0",
           },
         },
+        marquee: {
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(calc(-100% - var(--gap)))" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        marquee: "marquee var(--duration) linear infinite",
       },
     },
   },

@@ -117,7 +117,7 @@ export async function POST(request: Request) {
             : "In-Person",
         url: body.meetingLink,
         organizer: {
-          name: "epochTeleHealth",
+          name: "Epoch telehealth",
           email: "noreply@epochtelehealth.com",
         },
         status: "CONFIRMED" as const,

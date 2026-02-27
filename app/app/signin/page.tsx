@@ -12,6 +12,7 @@ import {
   Loader2,
   ArrowLeft,
   Lock,
+  KeyRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,6 +54,10 @@ export default function SignInPage() {
   const [authState, setAuthState] = useState<AuthState>("idle");
   const [authError, setAuthError] = useState("");
   const [activeTab, setActiveTab] = useState("signin");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
 
   // Check for auth callback
   useEffect(() => {
@@ -131,6 +136,25 @@ export default function SignInPage() {
         return "/admin";
       default:
         return "/dashboard";
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail) return;
+    setForgotLoading(true);
+    try {
+      const { error } = await AuthService.resetPassword(forgotEmail);
+      if (error) throw new Error(error);
+      setForgotSent(true);
+    } catch (err) {
+      toast({
+        variant: "destructive",
+        title: "Failed to send reset email",
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setForgotLoading(false);
     }
   };
 
@@ -501,6 +525,61 @@ export default function SignInPage() {
 
                   {/* Sign In Form */}
                   <TabsContent value="signin">
+                    {showForgotPassword ? (
+                      <div className="space-y-4">
+                        {forgotSent ? (
+                          <div className="text-center space-y-3 py-4">
+                            <div className="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto">
+                              <CheckCircle className="w-6 h-6 text-green-600" />
+                            </div>
+                            <p className="font-semibold text-slate-900 dark:text-white">Check your inbox</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">We sent a password reset link to <strong>{forgotEmail}</strong></p>
+                            <button
+                              onClick={() => { setShowForgotPassword(false); setForgotSent(false); setForgotEmail(""); }}
+                              className="text-sm text-[#004DFF] hover:underline font-medium"
+                            >
+                              Back to Sign In
+                            </button>
+                          </div>
+                        ) : (
+                          <form onSubmit={handleForgotPassword} className="space-y-4">
+                            <div className="space-y-1">
+                              <p className="text-sm text-slate-600 dark:text-slate-400">Enter your email and we&apos;ll send you a reset link.</p>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="forgot-email">Email</Label>
+                              <div className="relative">
+                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                <Input
+                                  id="forgot-email"
+                                  type="email"
+                                  placeholder="Enter your email"
+                                  value={forgotEmail}
+                                  onChange={(e) => setForgotEmail(e.target.value)}
+                                  className="pl-10"
+                                  required
+                                />
+                              </div>
+                            </div>
+                            <Button
+                              type="submit"
+                              className="w-full bg-[#004DFF] hover:bg-[#003bbd] text-white"
+                              disabled={forgotLoading || !forgotEmail}
+                            >
+                              {forgotLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <KeyRound className="w-4 h-4 mr-2" />}
+                              Send Reset Link
+                            </Button>
+                            <button
+                              type="button"
+                              onClick={() => setShowForgotPassword(false)}
+                              className="w-full text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                            >
+                              Back to Sign In
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                    ) : (
                     <form onSubmit={handleEmailSignIn} className="space-y-4">
                       <div className="space-y-2">
                         <Label htmlFor="email">Email</Label>
@@ -519,7 +598,16 @@ export default function SignInPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="password">Password</Label>
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="password">Password</Label>
+                          <button
+                            type="button"
+                            onClick={() => setShowForgotPassword(true)}
+                            className="text-xs text-[#004DFF] hover:underline font-medium"
+                          >
+                            Forgot password?
+                          </button>
+                        </div>
                         <div className="relative">
                           <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                           <Input
@@ -536,7 +624,7 @@ export default function SignInPage() {
 
                       <Button
                         type="submit"
-                        className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white relative"
+                        className="w-full bg-[#004DFF] hover:bg-[#003bbd] text-white"
                         disabled={isProcessing || !email || !password}
                       >
                         {authState === "email-signin" ? (
@@ -547,6 +635,7 @@ export default function SignInPage() {
                         Sign In
                       </Button>
                     </form>
+                    )}
                   </TabsContent>
 
                   {/* Sign Up Form */}
@@ -604,7 +693,7 @@ export default function SignInPage() {
 
                       <Button
                         type="submit"
-                        className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white relative"
+                        className="w-full bg-[#004DFF] hover:bg-[#003bbd] text-white"
                         disabled={
                           isProcessing ||
                           !signupEmail ||
@@ -624,39 +713,15 @@ export default function SignInPage() {
                 </Tabs>
 
                 <div className="text-center text-sm text-gray-600 dark:text-gray-400">
-                  <div className="flex items-center justify-center space-x-2 mb-2">
-                    <CheckCircle className="w-4 h-4" />
-                    <span>Secure authentication with Supabase</span>
-                  </div>
-                  <p className="text-xs">Your data is encrypted and secure</p>
+                  <p className="text-xs">
+                    By signing in you agree to our{" "}
+                    <Link href="/terms" className="text-[#004DFF] hover:underline font-medium">Terms of Service</Link>
+                    {" "}and{" "}
+                    <Link href="/privacy" className="text-[#004DFF] hover:underline font-medium">Privacy Policy</Link>
+                  </p>
                 </div>
               </CardContent>
             </Card>
-          </motion.div>
-
-          {/* Footer */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="text-center mt-8 text-sm text-gray-600 dark:text-gray-400"
-          >
-            <p>
-              By signing in, you agree to our{" "}
-              <Link
-                href="/terms"
-                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
-              >
-                Terms of Service
-              </Link>{" "}
-              and{" "}
-              <Link
-                href="/privacy"
-                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
-              >
-                Privacy Policy
-              </Link>
-            </p>
           </motion.div>
         </div>
       </div>

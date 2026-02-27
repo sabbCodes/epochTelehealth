@@ -1,4 +1,3 @@
-// app/api/create-room/route.ts - UPDATED WITH BETTER ERROR HANDLING
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {

@@ -200,7 +200,7 @@ export default function AdminDashboard() {
                   Admin Dashboard
                 </h1>
                 <p className="text-sm text-gray-600 dark:text-gray-300">
-                  epochTeleHealth Platform Management
+                  Epoch telehealth Platform Management
                 </p>
               </div>
             </div>

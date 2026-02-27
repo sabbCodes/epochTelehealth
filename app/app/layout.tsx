@@ -7,7 +7,7 @@ import { Toaster } from "@/components/ui/toaster";
 import ClientLayout from "./client-layout";
 
 export const metadata: Metadata = {
-  title: "epochTeleHealth - Healthcare Without Borders",
+  title: "Epoch telehealth - Healthcare Without Borders",
   description:
     "Connect with world-class doctors from anywhere. Secure your medical records on blockchain.",
 };
