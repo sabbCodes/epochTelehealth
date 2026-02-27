@@ -63,7 +63,7 @@ export function AppointmentEmail({ appointment }: AppointmentEmailProps) {
           {/* Header */}
           <Section style={header}>
             <Img
-              src="https://www.epochtelehealth.com/epochlogo.jpg"
+              src="https://www.epochtelehealth.com/epochlogo.png"
               width="160"
               alt="Epoch Telehealth"
               style={logo}
