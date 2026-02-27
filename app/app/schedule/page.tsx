@@ -29,21 +29,21 @@ import Link from "next/link";
 import { DoctorProfile, fetchDoctorById } from "@/lib/doctors";
 import { createSchedule } from "@/lib/schedules";
 import DoctorProfileSkeleton from "@/components/doctorprofileskeleton";
-import { TelehealthsolEscrow } from "@/utils/telehealthsol_escrow";
-import idl from "@/utils/telehealthsol_escrow.json";
-import {
-  PublicKey,
-  Connection,
-  SystemProgram,
-  Transaction,
-  LAMPORTS_PER_SOL,
-} from "@solana/web3.js";
-import { BN, Program } from "@coral-xyz/anchor";
-import {
-  getAssociatedTokenAddressSync,
-  TOKEN_PROGRAM_ID,
-  ASSOCIATED_TOKEN_PROGRAM_ID
-} from "@solana/spl-token";
+// import { TelehealthsolEscrow } from "@/utils/telehealthsol_escrow";
+// import idl from "@/utils/telehealthsol_escrow.json";
+// import {
+//   PublicKey,
+//   Connection,
+//   SystemProgram,
+//   Transaction,
+//   LAMPORTS_PER_SOL,
+// } from "@solana/web3.js";
+// import { BN, Program } from "@coral-xyz/anchor";
+// import {
+//   getAssociatedTokenAddressSync,
+//   TOKEN_PROGRAM_ID,
+//   ASSOCIATED_TOKEN_PROGRAM_ID
+// } from "@solana/spl-token";
 import {
   usePhantom,
   useModal,
@@ -51,9 +51,9 @@ import {
   useSolana,
 } from "@phantom/react-sdk";
 
-const idl_string = JSON.stringify(idl);
-const idl_object = JSON.parse(idl_string);
-const programID = new PublicKey(idl.address);
+// const idl_string = JSON.stringify(idl);
+// const idl_object = JSON.parse(idl_string);
+// const programID = new PublicKey(idl.address);
 
 export default function SchedulePage() {
   const searchParams = useSearchParams();
