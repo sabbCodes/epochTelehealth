@@ -1,8 +1,7 @@
 "use client";
 
 import type React from "react";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -20,7 +19,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-// import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -42,14 +40,14 @@ export default function PatientOnboardingPage() {
   const email = searchParams.get("email") || "";
   const walletAddress = searchParams.get("walletAddress") || "";
 
-  const [currentStep, setCurrentStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedWallet, setCopiedWallet] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState({
+  const defaultFormData = {
     firstName: "",
     lastName: "",
     email: email,
@@ -57,9 +55,52 @@ export default function PatientOnboardingPage() {
     dateOfBirth: "",
     gender: "",
     profileImage: null as File | null,
+  };
+
+  // Lazy initializer: read localStorage synchronously on first render
+  const [formData, setFormData] = useState(() => {
+    if (typeof window === "undefined") return defaultFormData;
+    try {
+      const saved = localStorage.getItem("epoch_patient_onboarding");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          ...defaultFormData,
+          ...parsed,
+          profileImage: null as File | null,
+          email: email || parsed.email || "",
+          walletAddress: walletAddress || parsed.walletAddress || "",
+        };
+      }
+    } catch {}
+    return defaultFormData;
+  });
+
+  const [currentStep, setCurrentStep] = useState(() => {
+    if (typeof window === "undefined") return 1;
+    try {
+      const saved = localStorage.getItem("epoch_patient_onboarding");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.currentStep || 1;
+      }
+    } catch {}
+    return 1;
   });
 
   const [agreedToPolicy, setAgreedToPolicy] = useState(false);
+
+  // Save state on every change
+  useEffect(() => {
+    const { profileImage, ...dataToSave } = formData;
+    localStorage.setItem("epoch_patient_onboarding", JSON.stringify({ ...dataToSave, currentStep }));
+    setSaveStatus("saving");
+    const timer = setTimeout(() => {
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [formData, currentStep]);
 
   const totalSteps = 3;
 
@@ -103,12 +144,12 @@ export default function PatientOnboardingPage() {
   };
 
   const updateFormData = (field: string, value: string | File | null) => {
-    setFormData((prev) => ({
+    setFormData((prev: typeof formData) => ({
       ...prev,
       [field]: value,
     }));
     if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: "" }));
+      setErrors((prev: Record<string, string>) => ({ ...prev, [field]: "" }));
     }
   };
 
@@ -238,11 +279,13 @@ export default function PatientOnboardingPage() {
         throw new Error(errorMessage);
       }
 
+      localStorage.removeItem("epoch_patient_onboarding");
+
       // Show success message
       toast({
         title: "Profile Created Successfully!",
         description:
-          "Your patient profile has been created. You can now sign in to access your account.",
+          "Your profile has been created. You can now sign in to access your account.",
       });
 
       // Redirect to signin page after a short delay
@@ -278,10 +321,10 @@ export default function PatientOnboardingPage() {
             className="space-y-6"
           >
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-[#004DFF] rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-blue-500/20">
                 <User className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                 Personal Information
               </h2>
               <p className="text-gray-600 dark:text-gray-300">
@@ -417,10 +460,10 @@ export default function PatientOnboardingPage() {
             className="space-y-6"
           >
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-[#004DFF] rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-blue-500/20">
                 <Camera className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                 Profile Picture
               </h2>
               <p className="text-gray-600 dark:text-gray-300">
@@ -493,10 +536,10 @@ export default function PatientOnboardingPage() {
             className="space-y-6"
           >
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-[#004DFF] rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-blue-500/20">
                 <CheckCircle className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                 Almost Done!
               </h2>
               <p className="text-gray-600 dark:text-gray-300">
@@ -621,24 +664,33 @@ export default function PatientOnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b">
+      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Link href="/" className="flex items-center space-x-2">
+              <Image
+                src="/telehealthlogo.svg"
+                alt="Epoch telehealth logo short"
+                width={40}
+                height={40}
+                className="h-8 w-auto md:hidden"
+              />
               <Image
                 src="/telehealthlogowithtext.svg"
                 alt="Epoch telehealth logo"
                 width={150}
                 height={40}
-                className="h-8 w-auto"
+                className="h-8 w-auto hidden md:block"
               />
             </Link>
           </div>
-          <div className="flex items-center space-x-2">
-            <Users className="w-5 h-5 text-blue-600" />
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+          <div className="flex items-center space-x-3">
+            {saveStatus === "saving" && <span className="text-xs text-[#004DFF] ml-2 animate-pulse">Saving...</span>}
+            {saveStatus === "saved" && <span className="text-xs text-emerald-500 ml-2">Saved ✓</span>}
+            <Users className="w-5 h-5 text-[#004DFF]" />
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
               Patient Registration
             </span>
           </div>
@@ -649,16 +701,16 @@ export default function PatientOnboardingPage() {
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
               Step {currentStep} of {totalSteps}
             </span>
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
               {Math.round((currentStep / totalSteps) * 100)}%
             </span>
           </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+          <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
             <motion.div
-              className="bg-gradient-to-r from-blue-600 to-green-600 h-2 rounded-full"
+              className="bg-[#004DFF] h-2 rounded-full"
               initial={{ width: 0 }}
               animate={{ width: `${(currentStep / totalSteps) * 100}%` }}
               transition={{ duration: 0.5 }}
@@ -700,7 +752,7 @@ export default function PatientOnboardingPage() {
                 <Button
                   onClick={handleSubmit}
                   disabled={isSubmitting || !agreedToPolicy}
-                  className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white flex items-center"
+                  className="bg-[#004DFF] hover:bg-[#003bbd] text-white flex items-center"
                 >
                   {isSubmitting ? (
                     <>
@@ -717,7 +769,7 @@ export default function PatientOnboardingPage() {
               ) : (
                 <Button
                   onClick={nextStep}
-                  className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white flex items-center"
+                  className="bg-[#004DFF] hover:bg-[#003bbd] text-white flex items-center"
                 >
                   Next Step
                   <ArrowRight className="w-4 h-4 ml-2" />

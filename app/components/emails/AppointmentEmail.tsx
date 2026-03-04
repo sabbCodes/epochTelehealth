@@ -170,14 +170,14 @@ const container = {
 };
 
 const header = {
-  backgroundColor: '#004DFF',
+  backgroundColor: '#ffffff',
   padding: '36px 48px',
   textAlign: 'center' as const,
+  borderBottom: '1px solid #e2e8f0',
 };
 
 const logo = {
   margin: '0 auto',
-  filter: 'brightness(0) invert(1)',
   height: 'auto',
 };
 

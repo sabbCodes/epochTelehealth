@@ -189,6 +189,9 @@ async function parseFormData(
         console.log(`Processing profile image upload (${file.name}, ${file.size} bytes)`);
       } else if (key === "pharmacyLicense") {
         folder = "licenses";
+      } else if (key === "medicalLicense") {
+        folder = "licenses";
+        bucketName = "certification_images";
       } else if (key === "businessRegistration") {
         folder = "registrations";
       } else if (key.includes("profile")) {
@@ -333,7 +336,7 @@ export async function POST(request: Request) {
         break;
 
       case "doctor":
-        const availability = {
+        const availability = formData.availability || {
           monday: false,
           tuesday: false,
           wednesday: false,
@@ -387,7 +390,9 @@ export async function POST(request: Request) {
           education: formData.education,
           hospitalAffiliation: formData.hospitalAffiliation,
           bio: formData.bio,
-          consultationFee: formData.consultationFee,
+          consultationFee30minChat: formData.consultationFee30minChat,
+          consultationFee30minVideo: formData.consultationFee30minVideo,
+          consultationFee60minVideo: formData.consultationFee60minVideo,
           medicalLicense: formData.medicalLicense,
           medicalDegree: formData.medicalDegree,
           availability: availability,
@@ -635,7 +640,10 @@ export async function POST(request: Request) {
             years_of_experience: profileData.yearsOfExperience,
             education: profileData.education,
             languages: profileData.languages,
-            consultation_fee: profileData.consultationFee,
+            consultation_fee_30min_chat: profileData.consultationFee30minChat,
+            consultation_fee_30min_video: profileData.consultationFee30minVideo,
+            consultation_fee_60min_video: profileData.consultationFee60minVideo,
+            medical_license_url: profileData.medicalLicense,
             wallet_address: profileData.walletAddress,
             profile_image: profileData.profileImage,
             bio: profileData.bio,
@@ -665,7 +673,10 @@ export async function POST(request: Request) {
             years_of_experience: profileData.yearsOfExperience,
             education: profileData.education,
             languages: profileData.languages,
-            consultation_fee: profileData.consultationFee,
+            consultation_fee_30min_chat: profileData.consultationFee30minChat,
+            consultation_fee_30min_video: profileData.consultationFee30minVideo,
+            consultation_fee_60min_video: profileData.consultationFee60minVideo,
+            medical_license_url: profileData.medicalLicense,
             wallet_address: profileData.walletAddress,
             profile_image: profileData.profileImage,
             bio: profileData.bio,

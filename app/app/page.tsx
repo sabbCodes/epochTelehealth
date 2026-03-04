@@ -446,7 +446,7 @@ export default function LandingPage() {
       {/* Find Doctors Section */}
       <section
         id="find-doctors"
-        className="py-20 bg-white dark:bg-gray-900 relative overflow-hidden"
+        className="py-20 bg-white dark:bg-slate-900 relative overflow-hidden"
       >
         {/* Subtle background pattern */}
         <div className="absolute inset-0 opacity-5">
@@ -581,7 +581,7 @@ export default function LandingPage() {
                       whileInView={{ opacity: 1, y: 0 }}
                       transition={{ duration: 0.5, delay: index * 0.1 }}
                       viewport={{ once: true }}
-                      className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm"
+                      className="bg-white dark:bg-slate-800 rounded-lg p-4 shadow-sm"
                     >
                       <div className="flex items-center space-x-3">
                         <Avatar>
@@ -778,7 +778,7 @@ export default function LandingPage() {
               className="relative"
             >
               <div className="bg-[#004DFF] rounded-3xl p-1 shadow-2xl">
-                <div className="bg-white dark:bg-gray-900 rounded-[1.4rem] p-8 md:p-12 h-full w-full">
+                <div className="bg-white dark:bg-slate-900 rounded-[1.4rem] p-8 md:p-12 h-full w-full">
                   <div className="flex justify-center mb-8">
                     <Shield className="w-24 h-24 text-[#004DFF] stroke-[1.5]" />
                   </div>
@@ -809,7 +809,7 @@ export default function LandingPage() {
       {/* About Section */}
       <section
         id="about"
-        className="py-20 bg-gray-50 dark:bg-gray-800 relative overflow-hidden"
+        className="py-20 bg-slate-50 dark:bg-slate-800 relative overflow-hidden"
       >
         {/* Subtle background pattern */}
         <div className="absolute inset-0 opacity-5">
@@ -992,7 +992,7 @@ export default function LandingPage() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-20 bg-gray-50 dark:bg-gray-800">
+      <section className="py-20 bg-slate-50 dark:bg-slate-800">
         <div className="container mx-auto px-4">
           <div className="bg-[#004DFF] rounded-[3rem] p-12 lg:p-20 text-center relative overflow-hidden shadow-2xl shadow-blue-200">
             <div className="absolute top-0 left-0 w-full h-full opacity-10 pointer-events-none">

@@ -1,8 +1,7 @@
 "use client";
 
 import type React from "react";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import {
@@ -45,15 +44,14 @@ export default function DoctorOnboardingPage() {
   const email = searchParams?.get("email") || "";
   const walletAddress = searchParams?.get("walletAddress") || "";
 
-  const [currentStep, setCurrentStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedWallet, setCopiedWallet] = useState(false);
-  const [agreedToPolicy, setAgreedToPolicy] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
   const [profileImage, setProfileImage] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState({
+  const defaultFormData = {
     firstName: "",
     lastName: "",
     email: email,
@@ -68,22 +66,82 @@ export default function DoctorOnboardingPage() {
     education: "",
     hospitalAffiliation: "",
     bio: "",
-    consultationFee: "",
+    consultationFee30minChat: "",
+    consultationFee30minVideo: "",
+    consultationFee60minVideo: "",
     isVerified: false,
     languages: [] as string[],
     availability: {
-      monday: false,
-      tuesday: false,
-      wednesday: false,
-      thursday: false,
-      friday: false,
-      saturday: false,
-      sunday: false,
+      monday: { isOpen: false, start: "09:00", end: "17:00" },
+      tuesday: { isOpen: false, start: "09:00", end: "17:00" },
+      wednesday: { isOpen: false, start: "09:00", end: "17:00" },
+      thursday: { isOpen: false, start: "09:00", end: "17:00" },
+      friday: { isOpen: false, start: "09:00", end: "17:00" },
+      saturday: { isOpen: false, start: "09:00", end: "17:00" },
+      sunday: { isOpen: false, start: "09:00", end: "17:00" },
     },
     profileImage: null as File | null,
     medicalLicense: null as File | null,
     medicalDegree: null as File | null,
+  };
+
+  // Lazy initializer: read localStorage synchronously on first render so
+  // the save effect never sees blank state during mount.
+  const [formData, setFormData] = useState(() => {
+    if (typeof window === "undefined") return defaultFormData;
+    try {
+      const saved = localStorage.getItem("epoch_doctor_onboarding");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          ...defaultFormData,
+          ...parsed,
+          profileImage: null as File | null,
+          medicalLicense: null as File | null,
+          medicalDegree: null as File | null,
+          email: email || parsed.email || "",
+          walletAddress: walletAddress || parsed.walletAddress || "",
+        };
+      }
+    } catch {}
+    return defaultFormData;
   });
+
+  const [currentStep, setCurrentStep] = useState(() => {
+    if (typeof window === "undefined") return 1;
+    try {
+      const saved = localStorage.getItem("epoch_doctor_onboarding");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.currentStep || 1;
+      }
+    } catch {}
+    return 1;
+  });
+
+  const [agreedToPolicy, setAgreedToPolicy] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      const saved = localStorage.getItem("epoch_doctor_onboarding");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed.agreedToPolicy || false;
+      }
+    } catch {}
+    return false;
+  });
+
+  // Save state on every change
+  useEffect(() => {
+    const { profileImage, medicalLicense, medicalDegree, ...dataToSave } = formData;
+    localStorage.setItem("epoch_doctor_onboarding", JSON.stringify({ ...dataToSave, currentStep, agreedToPolicy }));
+    setSaveStatus("saving");
+    const timer = setTimeout(() => {
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [formData, currentStep, agreedToPolicy]);
 
   const totalSteps = 5;
 
@@ -104,6 +162,9 @@ export default function DoctorOnboardingPage() {
       if (!formData.phone.trim()) {
         console.log('Phone number is missing');
         newErrors.phone = "Phone number is required";
+      } else if (!/^\+?\d{7,15}$/.test(formData.phone)) {
+        console.log('Phone number is invalid');
+        newErrors.phone = "Please enter a valid phone number (e.g. +1234567890)";
       }
       if (!formData.gender) {
         console.log('Gender is missing');
@@ -150,9 +211,19 @@ export default function DoctorOnboardingPage() {
         console.log('Bio is too short');
         newErrors.bio = "Bio must be at least 50 characters";
       }
-      if (!formData.consultationFee) {
-        console.log('Consultation fee is missing');
-        newErrors.consultationFee = "Consultation fee is required";
+      if (!formData.consultationFee30minChat) {
+        newErrors.consultationFee30minChat = "Required";
+      }
+      if (!formData.consultationFee30minVideo) {
+        newErrors.consultationFee30minVideo = "Required";
+      }
+      if (!formData.consultationFee60minVideo) {
+        newErrors.consultationFee60minVideo = "Required";
+      }
+      
+      const hasOpenDay = (Object.values(formData.availability) as { isOpen: boolean; start: string; end: string }[]).some((day) => day.isOpen);
+      if (!hasOpenDay) {
+        newErrors.availability = "Set at least one available day";
       }
       if (formData.languages.length === 0) {
         console.log('No languages selected');
@@ -160,10 +231,13 @@ export default function DoctorOnboardingPage() {
       }
     } else if (currentStep === 4) {
       console.log('Validating step 4 fields');
-      console.log('profileImage:', formData.profileImage);
       if (!formData.profileImage) {
         console.log('Profile image is missing');
         newErrors.profileImage = "Profile image is required";
+      }
+      if (!formData.medicalLicense) {
+        console.log('Medical license is missing');
+        newErrors.medicalLicense = "Medical license document is required";
       }
     }
 
@@ -184,16 +258,32 @@ export default function DoctorOnboardingPage() {
   };
 
   const updateFormData = (field: string, value: string | string[] | number | boolean | File | null) => {
-    setFormData((prev) => ({
+    setFormData((prev: typeof formData) => ({
       ...prev,
       [field]: value,
     }));
     if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: "" }));
+      setErrors((prev: Record<string, string>) => ({ ...prev, [field]: "" }));
     }
   };
 
-  const MAX_FILE_SIZE = 250 * 1024;
+  const updateAvailability = (day: string, field: string, value: boolean | string) => {
+    setFormData((prev: typeof formData) => ({
+      ...prev,
+      availability: {
+        ...prev.availability,
+        [day]: {
+          ...prev.availability[day as keyof typeof prev.availability],
+          [field]: value,
+        },
+      },
+    }));
+    if (errors.availability) {
+      setErrors((prev) => ({ ...prev, availability: "" }));
+    }
+  };
+
+  const MAX_FILE_SIZE = 1024 * 1024;
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -275,7 +365,7 @@ export default function DoctorOnboardingPage() {
     // Only proceed to next step if validation passes and we're not on the last step
     if (currentStep < totalSteps) {
       console.log('Proceeding to step:', currentStep + 1);
-      setCurrentStep(prevStep => {
+      setCurrentStep((prevStep: number) => {
         const nextStep = prevStep + 1;
         console.log('Updated step to:', nextStep);
         return nextStep;
@@ -327,7 +417,9 @@ export default function DoctorOnboardingPage() {
         education: formData.education,
         isVerified: false,
         hospitalAffiliation: formData.hospitalAffiliation,
-        consultationFee: parseFloat(formData.consultationFee) || 0,
+        consultationFee30minChat: parseFloat(formData.consultationFee30minChat) || 0,
+        consultationFee30minVideo: parseFloat(formData.consultationFee30minVideo) || 0,
+        consultationFee60minVideo: parseFloat(formData.consultationFee60minVideo) || 0,
         bio: formData.bio,
         availability: JSON.stringify(formData.availability),
       };
@@ -342,6 +434,12 @@ export default function DoctorOnboardingPage() {
       // Add languages as a JSON string to ensure proper array handling
       if (formData.languages && formData.languages.length > 0) {
         formDataToSend.append('languages', JSON.stringify(formData.languages));
+      }
+
+      // Add education as a JSON string to ensure proper array handling
+      if (formData.education) {
+        const educationArray = formData.education.split(',').map((e: string) => e.trim()).filter(Boolean);
+        formDataToSend.append('education', JSON.stringify(educationArray));
       }
       
       // Add files to FormData if they exist
@@ -398,10 +496,12 @@ export default function DoctorOnboardingPage() {
         throw new Error(errorMessage);
       }
 
+      localStorage.removeItem("epoch_doctor_onboarding");
+
       // Show success message
       toast({
         title: "Profile Created Successfully!",
-        description: "Your doctor profile has been created. You can now sign in to access your account.",
+        description: "Your profile has been created. You can now sign in to access your account.",
         variant: "default",
       });
 
@@ -461,6 +561,20 @@ export default function DoctorOnboardingPage() {
     "United Kingdom",
     "Canada",
     "Australia",
+    "India",
+    "Germany",
+    "France",
+    "Japan",
+    "China",
+    "Brazil",
+    "Mexico",
+    "United Arab Emirates",
+    "Saudi Arabia",
+    "Singapore",
+    "New Zealand",
+    "Ireland",
+    "Italy",
+    "Spain",
   ];
 
   const specialties = [
@@ -476,7 +590,24 @@ export default function DoctorOnboardingPage() {
     "Endocrinology",
     "Gastroenterology",
     "Pulmonology",
-    "Physiotherapy"
+    "Physiotherapy",
+    "Dentistry",
+    "Orthodontics",
+    "Periodontics",
+    "Endodontics",
+    "Oral and Maxillofacial Surgery",
+    "Prosthodontics",
+    "Pediatric Dentistry",
+    "Anesthesiology",
+    "Emergency Medicine",
+    "Family Medicine",
+    "Internal Medicine",
+    "Obstetrics and Gynecology",
+    "Ophthalmology",
+    "Pathology",
+    "Radiology",
+    "Surgery",
+    "Urology",
   ];
 
   const genderOptions = [
@@ -514,10 +645,10 @@ export default function DoctorOnboardingPage() {
             className="space-y-6"
           >
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-[#004DFF] rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-blue-500/20">
                 <User className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                 Personal Information
               </h2>
               <p className="text-gray-600 dark:text-gray-300">
@@ -609,7 +740,12 @@ export default function DoctorOnboardingPage() {
                 <Input
                   id="phone"
                   value={formData.phone}
-                  onChange={(e) => updateFormData("phone", e.target.value)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === "" || /^\+?\d*$/.test(val)) {
+                      updateFormData("phone", val);
+                    }
+                  }}
                   placeholder="+234 xxx xxx xxxx"
                   className={errors.phone ? "border-red-500" : ""}
                 />
@@ -638,7 +774,7 @@ export default function DoctorOnboardingPage() {
               </div>
               <div>
                 <Label htmlFor="country">
-                  Country <span className="text-red-500">*</span>
+                  Country of residence<span className="text-red-500">*</span>
                 </Label>
                 <Select
                   value={formData.country}
@@ -686,10 +822,10 @@ export default function DoctorOnboardingPage() {
             className="space-y-6"
           >
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-[#004DFF] rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-blue-500/20">
                 <Stethoscope className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                 Professional Information
               </h2>
               <p className="text-gray-600 dark:text-gray-300">
@@ -741,7 +877,7 @@ export default function DoctorOnboardingPage() {
 
             <div>
               <Label htmlFor="licenseNumber">
-                Medical License Number <span className="text-red-500">*</span>
+                Medical License Number/Mat No. (Med Students) <span className="text-red-500">*</span>
               </Label>
               <Input
                 id="licenseNumber"
@@ -749,7 +885,7 @@ export default function DoctorOnboardingPage() {
                 onChange={(e) =>
                   updateFormData("licenseNumber", e.target.value)
                 }
-                placeholder="Enter your medical license number"
+                placeholder="Enter your medical license number or registration number(med students)"
                 className={errors.licenseNumber ? "border-red-500" : ""}
               />
               {getFieldError("licenseNumber")}
@@ -764,9 +900,10 @@ export default function DoctorOnboardingPage() {
                 id="education"
                 value={formData.education}
                 onChange={(e) => updateFormData("education", e.target.value)}
-                placeholder="List your medical degree, residency, fellowships, and certifications"
+                placeholder="List your medical degrees, residencies, etc. (Separate each entry with commas)"
                 className={`min-h-[100px] ${errors.education ? "border-red-500" : ""}`}
               />
+              <p className="text-xs text-gray-500 mt-1">Separate each entry with commas (e.g., MD from Harvard, Residency at Johns Hopkins)</p>
               {getFieldError("education")}
             </div>
 
@@ -795,10 +932,10 @@ export default function DoctorOnboardingPage() {
             className="space-y-6"
           >
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-[#004DFF] rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-blue-500/20">
                 <FileText className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                 Bio & Consultation
               </h2>
               <p className="text-gray-600 dark:text-gray-300">
@@ -820,29 +957,106 @@ export default function DoctorOnboardingPage() {
               {getFieldError("bio")}
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
-                <Label htmlFor="consultationFee">
-                  Consultation Fee (USDC) <span className="text-red-500">*</span>
+                <Label htmlFor="consultationFee30minChat">
+                  30min Chat Fee (USDC) <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="consultationFee"
+                  id="consultationFee30minChat"
                   type="number"
                   step="0.01"
-                  value={formData.consultationFee}
+                  value={formData.consultationFee30minChat}
                   onChange={(e) =>
-                    updateFormData("consultationFee", e.target.value)
+                    updateFormData("consultationFee30minChat", e.target.value)
+                  }
+                  placeholder="e.g., 3.00"
+                  className={errors.consultationFee30minChat ? "border-red-500" : ""}
+                />
+                {getFieldError("consultationFee30minChat")}
+              </div>
+              <div>
+                <Label htmlFor="consultationFee30minVideo">
+                  30min Video Fee (USDC) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="consultationFee30minVideo"
+                  type="number"
+                  step="0.01"
+                  value={formData.consultationFee30minVideo}
+                  onChange={(e) =>
+                    updateFormData("consultationFee30minVideo", e.target.value)
                   }
                   placeholder="e.g., 5.00"
-                  className={errors.consultationFee ? "border-red-500" : ""}
+                  className={errors.consultationFee30minVideo ? "border-red-500" : ""}
                 />
-                {getFieldError("consultationFee")}
+                {getFieldError("consultationFee30minVideo")}
+              </div>
+              <div>
+                <Label htmlFor="consultationFee60minVideo">
+                  1 Hour Video Fee (USDC) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="consultationFee60minVideo"
+                  type="number"
+                  step="0.01"
+                  value={formData.consultationFee60minVideo}
+                  onChange={(e) =>
+                    updateFormData("consultationFee60minVideo", e.target.value)
+                  }
+                  placeholder="e.g., 8.00"
+                  className={errors.consultationFee60minVideo ? "border-red-500" : ""}
+                />
+                {getFieldError("consultationFee60minVideo")}
+              </div>
+            </div>
+
+            <div className="space-y-8">
+              <div>
+                <Label className="text-base font-medium">
+                  Availability Schedule <span className="text-red-500">*</span>
+                </Label>
+                <div className="space-y-3 mt-3">
+                  {(Object.entries(formData.availability) as [string, { isOpen: boolean; start: string; end: string }][]).map(([day, hours]) => (
+                    <div key={day} className="flex items-center space-x-4">
+                      <div className="w-20">
+                        <Checkbox
+                          checked={hours.isOpen}
+                          onCheckedChange={(checked) =>
+                            updateAvailability(day, "isOpen", checked as boolean)
+                          }
+                        />
+                      </div>
+                      <div className="w-24 capitalize font-medium">{day}</div>
+                      {hours.isOpen ? (
+                        <div className="flex items-center space-x-2">
+                          <Input
+                            type="time"
+                            value={hours.start}
+                            onChange={(e) => updateAvailability(day, "start", e.target.value)}
+                            className="w-32"
+                          />
+                          <span>to</span>
+                          <Input
+                            type="time"
+                            value={hours.end}
+                            onChange={(e) => updateAvailability(day, "end", e.target.value)}
+                            className="w-32"
+                          />
+                        </div>
+                      ) : (
+                        <span className="text-gray-500">Closed</span>
+                      )}
+                    </div>
+                  ))}
+                  {getFieldError("availability")}
+                </div>
               </div>
               <div>
                 <Label htmlFor="languages">
                   Languages Spoken <span className="text-red-500">*</span>
                 </Label>
-                <div className="space-y-2">
+                <div className="space-y-2 mt-3">
                   {languages.map((language) => (
                     <div key={language} className="flex items-center space-x-2">
                       <input
@@ -858,7 +1072,7 @@ export default function DoctorOnboardingPage() {
                           } else {
                             updateFormData(
                               "languages",
-                              formData.languages.filter((l) => l !== language)
+                              formData.languages.filter((l: string) => l !== language)
                             );
                           }
                         }}
@@ -885,10 +1099,10 @@ export default function DoctorOnboardingPage() {
             className="space-y-6"
           >
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-[#004DFF] rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-blue-500/20">
                 <Camera className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                 Profile Picture
               </h2>
               <p className="text-gray-600 dark:text-gray-300">
@@ -948,6 +1162,51 @@ export default function DoctorOnboardingPage() {
                   Supported formats: JPG, PNG (max 1MB)
                 </p>
               </div>
+
+              <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center mt-6">
+                <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="font-medium text-gray-900 dark:text-white mb-2">
+                  Upload Medical License
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+                  Upload a scanned copy or PDF of your medical license
+                </p>
+                <input
+                  type="file"
+                  accept=".pdf,image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      if (file.size > 1024 * 1024) { // 1MB limit
+                        toast({
+                          title: "File too large",
+                          description: "The selected file exceeds the maximum allowed size of 1MB.",
+                          variant: "destructive",
+                        });
+                        e.target.value = '';
+                        return;
+                      }
+                      const newFile = new File([file], file.name, { type: file.type });
+                      updateFormData("medicalLicense", newFile);
+                    }
+                  }}
+                  className="hidden"
+                  id="medicalLicense"
+                />
+                <label htmlFor="medicalLicense">
+                  <Button variant="outline" asChild>
+                    <span className="cursor-pointer">
+                      {formData.medicalLicense ? "File Selected" : "Choose File"}
+                    </span>
+                  </Button>
+                </label>
+                {formData.medicalLicense && (
+                  <p className="text-sm text-green-600 mt-2">
+                    ✓ {formData.medicalLicense.name}
+                  </p>
+                )}
+                {getFieldError("medicalLicense")}
+              </div>
             </div>
           </motion.div>
         );
@@ -961,10 +1220,10 @@ export default function DoctorOnboardingPage() {
             className="space-y-6"
           >
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 bg-[#004DFF] rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-blue-500/20">
                 <Shield className="w-8 h-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+              <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                 Terms & Agreement
               </h2>
               <p className="text-gray-600 dark:text-gray-300">
@@ -979,7 +1238,7 @@ export default function DoctorOnboardingPage() {
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     <tr>
                       <td className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 w-1/3">Full Name</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{formData.firstName} {formData.lastName}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">Dr. {formData.firstName} {formData.lastName}</td>
                     </tr>
                     <tr>
                       <td className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Email</td>
@@ -996,6 +1255,16 @@ export default function DoctorOnboardingPage() {
                     <tr>
                       <td className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400">License Number</td>
                       <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">{formData.licenseNumber}</td>
+                    </tr>
+                    <tr>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Consultation Fees</td>
+                      <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                        <div className="space-y-1 text-xs">
+                          <div>30m Chat: ${formData.consultationFee30minChat}</div>
+                          <div>30m Video: ${formData.consultationFee30minVideo}</div>
+                          <div>1h Video: ${formData.consultationFee60minVideo}</div>
+                        </div>
+                      </td>
                     </tr>
                     <tr>
                       <td className="px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400">Documents</td>
@@ -1016,14 +1285,6 @@ export default function DoctorOnboardingPage() {
                               <XCircle className="w-4 h-4 text-red-500 mr-1" />
                             )}
                             <span className={formData.medicalLicense ? 'text-green-600' : 'text-red-600'}>Medical License</span>
-                          </div>
-                          <div className="flex items-center">
-                            {formData.medicalDegree ? (
-                              <CheckCircle className="w-4 h-4 text-green-500 mr-1" />
-                            ) : (
-                              <XCircle className="w-4 h-4 text-red-500 mr-1" />
-                            )}
-                            <span className={formData.medicalDegree ? 'text-green-600' : 'text-red-600'}>Medical Degree</span>
                           </div>
                         </div>
                       </td>
@@ -1059,17 +1320,17 @@ export default function DoctorOnboardingPage() {
               />
               <Label htmlFor="terms" className="text-sm">
                 I agree to the{" "}
-                <a href="#" className="text-blue-600 hover:underline">
+                <Link href="/terms" className="text-blue-600 hover:underline">
                   Terms of Service
-                </a>
+                </Link>
                 ,{" "}
-                <a href="#" className="text-blue-600 hover:underline">
+                <Link href="/privacy" className="text-blue-600 hover:underline">
                   Privacy Policy
-                </a>
+                </Link>
                 , and{" "}
-                <a href="#" className="text-blue-600 hover:underline">
+                <Link href="/guidelines" className="text-blue-600 hover:underline">
                   Medical Professional Guidelines
-                </a>
+                </Link>
               </Label>
             </div>
             {errors.policy && (
@@ -1084,24 +1345,33 @@ export default function DoctorOnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b">
+      <header className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Link href="/" className="flex items-center space-x-2">
+              <Image
+                src="/telehealthlogo.svg"
+                alt="Epoch telehealth logo short"
+                width={40}
+                height={40}
+                className="h-8 w-auto md:hidden"
+              />
               <Image
                 src="/telehealthlogowithtext.svg"
                 alt="Epoch telehealth logo"
                 width={150}
                 height={40}
-                className="h-8 w-auto"
+                className="h-8 w-auto hidden md:block"
               />
             </Link>
           </div>
-          <div className="flex items-center space-x-2">
-            <Stethoscope className="w-5 h-5 text-blue-600" />
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+          <div className="flex items-center space-x-3">
+            {saveStatus === "saving" && <span className="text-xs text-[#004DFF] ml-2 animate-pulse">Saving...</span>}
+            {saveStatus === "saved" && <span className="text-xs text-emerald-500 ml-2">Saved ✓</span>}
+            <Stethoscope className="w-5 h-5 text-[#004DFF]" />
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
               Doctor Registration
             </span>
           </div>
@@ -1112,16 +1382,16 @@ export default function DoctorOnboardingPage() {
         {/* Progress Bar */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
               Step {currentStep} of {totalSteps}
             </span>
-            <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+            <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
               {Math.round((currentStep / totalSteps) * 100)}%
             </span>
           </div>
-          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+          <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
             <motion.div
-              className="bg-gradient-to-r from-blue-600 to-green-600 h-2 rounded-full"
+              className="bg-[#004DFF] h-2 rounded-full"
               initial={{ width: 0 }}
               animate={{ width: `${(currentStep / totalSteps) * 100}%` }}
               transition={{ duration: 0.5 }}
@@ -1165,7 +1435,7 @@ export default function DoctorOnboardingPage() {
                   <Button
                     type="submit"
                     disabled={isSubmitting || !agreedToPolicy}
-                    className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white flex items-center"
+                    className="bg-[#004DFF] hover:bg-[#003bbd] text-white flex items-center"
                   >
                     {isSubmitting ? (
                       <>
@@ -1183,7 +1453,7 @@ export default function DoctorOnboardingPage() {
                   <Button
                     type="button"
                     onClick={nextStep}
-                    className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white flex items-center"
+                    className="bg-[#004DFF] hover:bg-[#003bbd] text-white flex items-center"
                   >
                     Next Step
                     <ArrowRight className="w-4 h-4 ml-2" />

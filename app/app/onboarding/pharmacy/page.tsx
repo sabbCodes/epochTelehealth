@@ -1,8 +1,7 @@
 "use client";
 
 import type React from "react";
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -40,11 +39,25 @@ import Link from "next/link";
 import Image from "next/image";
 
 export default function PharmacyOnboardingPage() {
-  const [currentStep, setCurrentStep] = useState(1);
+  const [currentStep, setCurrentStep] = useState(() => {
+    if (typeof window === "undefined") return 1;
+    try {
+      const saved = localStorage.getItem("epoch_pharmacy_onboarding");
+      if (saved) return JSON.parse(saved).currentStep || 1;
+    } catch {}
+    return 1;
+  });
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copiedWallet, setCopiedWallet] = useState(false);
-  const [agreedToPolicy, setAgreedToPolicy] = useState(false);
+  const [agreedToPolicy, setAgreedToPolicy] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      const saved = localStorage.getItem("epoch_pharmacy_onboarding");
+      if (saved) return JSON.parse(saved).agreedToPolicy || false;
+    } catch {}
+    return false;
+  });
 
   // const [pharmacyImages, setPharmacyImages] =  // State for image previews
   // const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -200,7 +213,42 @@ export default function PharmacyOnboardingPage() {
     registrationUrl: "",
   };
 
-  const [formData, setFormData] = useState<PharmacyFormData>(initialFormData);
+  // Lazy initializer: read localStorage synchronously on first render so
+  // the save effect never sees blank state during mount.
+  const [formData, setFormData] = useState<PharmacyFormData>(() => {
+    if (typeof window === "undefined") return initialFormData;
+    try {
+      const saved = localStorage.getItem("epoch_pharmacy_onboarding");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          ...initialFormData,
+          ...parsed,
+          // File fields can't be serialised — always reset to null/[]
+          pharmacyImages: [],
+          pharmacyLicense: null,
+          businessRegistration: null,
+          profileImage: null,
+          email: email || parsed.email || "",
+          walletAddress: walletAddress || parsed.walletAddress || "",
+        };
+      }
+    } catch {}
+    return initialFormData;
+  });
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+
+  // Save state on every change (safe — state is already hydrated from localStorage above)
+  useEffect(() => {
+    const { pharmacyImages, pharmacyLicense, businessRegistration, profileImage, ...dataToSave } = formData;
+    localStorage.setItem("epoch_pharmacy_onboarding", JSON.stringify({ ...dataToSave, currentStep, agreedToPolicy }));
+    setSaveStatus("saving");
+    const timer = setTimeout(() => {
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [formData, currentStep, agreedToPolicy]);
 
   const totalSteps = 5;
 
@@ -868,6 +916,8 @@ export default function PharmacyOnboardingPage() {
         throw new Error(responseData.error || responseData.message || "Failed to create profile");
       }
 
+      localStorage.removeItem("epoch_pharmacy_onboarding");
+
       // Show success message
       toast({
         title: "Profile Created Successfully!",
@@ -946,15 +996,24 @@ export default function PharmacyOnboardingPage() {
           <div className="flex items-center space-x-2">
             <Link href="/" className="flex items-center space-x-2">
               <Image
+                src="/telehealthlogo.svg"
+                alt="Epoch telehealth logo short"
+                width={40}
+                height={40}
+                className="h-8 w-auto md:hidden"
+              />
+              <Image
                 src="/telehealthlogowithtext.svg"
                 alt="Epoch telehealth logo"
                 width={150}
                 height={40}
-                className="h-8 w-auto"
+                className="h-8 w-auto hidden md:block"
               />
             </Link>
           </div>
           <div className="flex items-center space-x-2">
+            {saveStatus === "saving" && <span className="text-xs text-blue-500 ml-2 animate-pulse">Saving...</span>}
+            {saveStatus === "saved" && <span className="text-xs text-green-500 ml-2">Saved</span>}
             <Pill className="w-5 h-5 text-blue-600" />
             <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
               Pharmacy Registration
@@ -976,7 +1035,7 @@ export default function PharmacyOnboardingPage() {
           </div>
           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
             <motion.div
-              className="bg-gradient-to-r from-blue-600 to-green-600 h-2 rounded-full"
+              className="bg-[#004DFF] h-2 rounded-full"
               initial={{ width: 0 }}
               animate={{ width: `${(currentStep / totalSteps) * 100}%` }}
               transition={{ duration: 0.5 }}
@@ -1010,10 +1069,10 @@ export default function PharmacyOnboardingPage() {
                   className="space-y-6"
                 >
                   <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <div className="w-16 h-16 bg-[#004DFF] rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-blue-500/20">
                       <Building className="w-8 h-8 text-white" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                    <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                       Pharmacy Information
                     </h2>
                     <p className="text-gray-600 dark:text-gray-300">
@@ -1218,10 +1277,10 @@ export default function PharmacyOnboardingPage() {
                   className="space-y-6"
                 >
                   <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <div className="w-16 h-16 bg-[#004DFF] rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-blue-500/20">
                       <Camera className="w-8 h-8 text-white" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                    <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                       Pharmacy Photo
                     </h2>
                     <p className="text-gray-600 dark:text-gray-300">
@@ -1291,10 +1350,10 @@ export default function PharmacyOnboardingPage() {
                   className="space-y-6"
                 >
                   <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <div className="w-16 h-16 bg-[#004DFF] rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-blue-500/20">
                       <Shield className="w-8 h-8 text-white" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                    <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                       Legal & Location
                     </h2>
                     <p className="text-gray-600 dark:text-gray-300">
@@ -1446,10 +1505,10 @@ export default function PharmacyOnboardingPage() {
                   className="space-y-6"
                 >
                   <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <div className="w-16 h-16 bg-[#004DFF] rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-blue-500/20">
                       <Clock className="w-8 h-8 text-white" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                    <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                       Services & Operations
                     </h2>
                     <p className="text-gray-600 dark:text-gray-300">
@@ -1656,10 +1715,10 @@ export default function PharmacyOnboardingPage() {
                   className="space-y-6"
                 >
                   <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <div className="w-16 h-16 bg-[#004DFF] rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-blue-500/20">
                       <CheckCircle className="w-8 h-8 text-white" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                    <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
                       Review & Submit
                     </h2>
                     <p className="text-gray-600 dark:text-gray-300">
@@ -1828,7 +1887,7 @@ export default function PharmacyOnboardingPage() {
                   <Button
                     type="submit"
                     disabled={isSubmitting || !agreedToPolicy}
-                    className={`bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white flex items-center ${
+                    className={`bg-[#004DFF] hover:bg-[#003bbd] text-white flex items-center ${
                       !agreedToPolicy ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                     title={!agreedToPolicy ? 'Please agree to the terms and conditions' : ''}
@@ -1849,7 +1908,7 @@ export default function PharmacyOnboardingPage() {
               ) : (
                 <Button
                   onClick={nextStep}
-                  className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white flex items-center"
+                  className="bg-[#004DFF] hover:bg-[#003bbd] text-white flex items-center"
                 >
                   Next Step
                   <ArrowRight className="w-4 h-4 ml-2" />

@@ -4,8 +4,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { ArrowLeft, FileText } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function TermsOfServicePage() {
+  const router = useRouter();
   const effectiveDate = "February 27, 2026";
   const companyName = "Epoch Telehealth";
   const companyEmail = "legal@epochtelehealth.com";
@@ -21,10 +23,10 @@ export default function TermsOfServicePage() {
           </Link>
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <Link href="/" className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 hover:text-[#004DFF] transition-colors">
+            <button onClick={() => router.back()} className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 hover:text-[#004DFF] transition-colors cursor-pointer bg-transparent border-none p-0 outline-none">
               <ArrowLeft className="w-4 h-4" />
-              Back to Home
-            </Link>
+              Go Back
+            </button>
           </div>
         </div>
       </nav>
@@ -127,7 +129,7 @@ export default function TermsOfServicePage() {
 
           <div className="border-t border-slate-200 dark:border-slate-700 pt-10 mt-10 flex flex-col sm:flex-row items-center justify-between gap-4">
             <Link href="/privacy" className="text-[#004DFF] hover:underline font-medium text-sm">View Privacy Policy →</Link>
-            <Link href="/signin" className="text-[#004DFF] hover:underline font-medium text-sm">← Back to Sign In</Link>
+            <button onClick={() => router.back()} className="text-[#004DFF] hover:underline font-medium text-sm bg-transparent border-none p-0 outline-none cursor-pointer">← Go Back</button>
           </div>
         </div>
       </div>

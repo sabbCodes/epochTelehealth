@@ -23,6 +23,13 @@ export default function ClientLayoutContent({
     if (window.location.hash.startsWith("#access_token")) {
       const hash = window.location.hash.substring(1);
       const params = new URLSearchParams(hash);
+      
+      // If this is a password recovery link, DO NOT redirect to signin.
+      // Let the /reset-password page handle it.
+      if (params.get("type") === "recovery" || window.location.pathname === "/reset-password") {
+        return;
+      }
+      
       router.replace(`/signin?${params.toString()}`);
     }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Shield, User, ArrowLeft, ArrowRight } from "lucide-react";
@@ -27,21 +27,42 @@ export default function AdminOnboardingPage() {
   const email = searchParams.get("email") || "";
   const walletAddress = searchParams.get("walletAddress") || "";
 
-  const [formData, setFormData] = useState({
-    firstName: "",
-    lastName: "",
-    phone: "",
-    role: "admin",
-    department: "",
+  // Lazy initializer: read localStorage synchronously on first render
+  const [formData, setFormData] = useState(() => {
+    const defaults = {
+      firstName: "",
+      lastName: "",
+      phone: "",
+      role: "admin",
+      department: "",
+    };
+    if (typeof window === "undefined") return defaults;
+    try {
+      const saved = localStorage.getItem("epoch_admin_onboarding");
+      if (saved) return { ...defaults, ...JSON.parse(saved) };
+    } catch {}
+    return defaults;
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+
+  // Save state on every change (safe — state is already hydrated from localStorage above)
+  useEffect(() => {
+    localStorage.setItem("epoch_admin_onboarding", JSON.stringify(formData));
+    setSaveStatus("saving");
+    const timer = setTimeout(() => {
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [formData]);
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((prev: typeof formData) => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: "" }));
+      setErrors((prev: Record<string, string>) => ({ ...prev, [field]: "" }));
     }
   };
 
@@ -94,6 +115,9 @@ export default function AdminOnboardingPage() {
           description: "Your admin account has been set up successfully.",
         });
 
+        // Clear saved form data
+        localStorage.removeItem("epoch_admin_onboarding");
+
         // Store email for dashboard access
         localStorage.setItem("userEmail", email);
 
@@ -118,13 +142,7 @@ export default function AdminOnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 relative overflow-hidden">
-      {/* Subtle background pattern */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute top-20 left-20 w-32 h-32 bg-gradient-to-r from-blue-400 to-green-400 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-20 right-20 w-40 h-40 bg-gradient-to-r from-green-400 to-purple-400 rounded-full blur-3xl"></div>
-        <div className="absolute top-1/2 left-1/4 w-24 h-24 bg-gradient-to-r from-purple-400 to-blue-400 rounded-full blur-2xl"></div>
-      </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 relative overflow-hidden">
 
       {/* Back Button */}
       <motion.div
@@ -154,11 +172,18 @@ export default function AdminOnboardingPage() {
           >
             <Link href="/" className="inline-flex items-center space-x-2">
               <Image
+                src="/telehealthlogo.svg"
+                alt="Epoch telehealth logo short"
+                width={48}
+                height={48}
+                className="h-12 w-auto md:hidden"
+              />
+              <Image
                 src="/telehealthlogowithtext.svg"
                 alt="Epoch telehealth logo"
                 width={200}
                 height={50}
-                className="h-12 w-auto"
+                className="h-12 w-auto hidden md:block"
               />
             </Link>
           </motion.div>
@@ -171,11 +196,15 @@ export default function AdminOnboardingPage() {
             <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
               <CardHeader className="text-center">
                 <div className="mx-auto mb-4">
-                  <div className="w-16 h-16 bg-gradient-to-r from-red-500 to-red-600 rounded-2xl flex items-center justify-center">
+                  <div className="w-16 h-16 bg-[#004DFF] rounded-2xl flex items-center justify-center shadow-md shadow-blue-500/20">
                     <Shield className="w-8 h-8 text-white" />
                   </div>
                 </div>
-                <CardTitle className="text-2xl">Admin Account Setup</CardTitle>
+                <CardTitle className="text-2xl flex items-center justify-center gap-2">
+                  Admin Account Setup
+                  {saveStatus === "saving" && <span className="text-xs text-blue-500 font-normal animate-pulse">Saving...</span>}
+                  {saveStatus === "saved" && <span className="text-xs text-green-500 font-normal">Saved</span>}
+                </CardTitle>
                 <p className="text-gray-600 dark:text-gray-300">
                   Complete your admin profile to access the platform
                 </p>
@@ -275,7 +304,7 @@ export default function AdminOnboardingPage() {
                 <Button
                   onClick={handleSubmit}
                   disabled={isLoading}
-                  className="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white"
+                  className="w-full bg-[#004DFF] hover:bg-[#003bbd] text-white"
                 >
                   {isLoading ? (
                     "Creating Profile..."

@@ -13,6 +13,8 @@ import {
   ArrowLeft,
   Lock,
   KeyRound,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -58,6 +60,11 @@ export default function SignInPage() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSent, setForgotSent] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
+
+  // Password visibility
+  const [showPassword, setShowPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Check for auth callback
   useEffect(() => {
@@ -204,10 +211,27 @@ export default function SignInPage() {
 
           // Show dashboard redirection message
           if (toast) {
-            toast({
-              title: "Welcome back!",
-              description: `Redirecting to your ${user.user_type} dashboard...`,
-            });
+            if (user.user_type === "doctor") {
+              toast({
+                title: "Welcome back Doctor!",
+                description: `Redirecting to your dashboard...`,
+              });
+            } else if (user.user_type === "pharmacy") {
+              toast({
+                title: "Welcome back Pharmacy!",
+                description: `Redirecting to your dashboard...`,
+              });
+            } else if (user.user_type === "admin") {
+              toast({
+                title: "Welcome back Admin!",
+                description: `Redirecting to your dashboard...`,
+              });
+            } else {
+              toast({
+                title: "Welcome back!",
+                description: `Redirecting to your dashboard...`,
+              });
+            }
           }
 
           router.push(dashboardRoute);
@@ -376,7 +400,7 @@ export default function SignInPage() {
   const isProcessing = authState !== "idle";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 relative overflow-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 relative overflow-hidden">
       {/* Subtle background pattern */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute top-20 left-20 w-32 h-32 bg-gradient-to-r from-blue-400 to-green-400 rounded-full blur-3xl"></div>
@@ -394,7 +418,7 @@ export default function SignInPage() {
           <Button
             variant="ghost"
             size="sm"
-            className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800"
+            className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800"
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
           </Button>
@@ -425,7 +449,7 @@ export default function SignInPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
           >
-            <Card className="shadow-xl border-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm">
+            <Card className="shadow-xl border-0 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm">
               <CardHeader className="text-center space-y-1 pb-4">
                 <CardTitle className="text-2xl font-bold">Welcome</CardTitle>
                 <CardDescription>
@@ -612,13 +636,21 @@ export default function SignInPage() {
                           <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                           <Input
                             id="password"
-                            type="password"
+                            type={showPassword ? "text" : "password"}
                             placeholder="Enter your password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            className="pl-10"
+                            className="pl-10 pr-10"
                             required
                           />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword((v) => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                            tabIndex={-1}
+                          >
+                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
                         </div>
                       </div>
 
@@ -663,13 +695,21 @@ export default function SignInPage() {
                           <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                           <Input
                             id="signup-password"
-                            type="password"
+                            type={showSignupPassword ? "text" : "password"}
                             placeholder="Create a password"
                             value={signupPassword}
                             onChange={(e) => setSignupPassword(e.target.value)}
-                            className="pl-10"
+                            className="pl-10 pr-10"
                             required
                           />
+                          <button
+                            type="button"
+                            onClick={() => setShowSignupPassword((v) => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                            tabIndex={-1}
+                          >
+                            {showSignupPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
                         </div>
                       </div>
 
@@ -681,13 +721,21 @@ export default function SignInPage() {
                           <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                           <Input
                             id="confirm-password"
-                            type="password"
+                            type={showConfirmPassword ? "text" : "password"}
                             placeholder="Confirm your password"
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
-                            className="pl-10"
+                            className="pl-10 pr-10"
                             required
                           />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword((v) => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                            tabIndex={-1}
+                          >
+                            {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
                         </div>
                       </div>
 
