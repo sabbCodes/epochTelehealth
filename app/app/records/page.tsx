@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, ReactNode } from "react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import {
   FileText,
@@ -15,6 +16,7 @@ import {
   Clock,
   RefreshCw,
   Hash,
+  ArrowLeft,
 } from "lucide-react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { Connection, PublicKey } from "@solana/web3.js";
@@ -128,6 +130,7 @@ const u128ToString = (value: bigint): string => {
 };
 
 export default function RecordsPage() {
+  const router = useRouter();
   const { publicKey, signTransaction, signAllTransactions } = useWallet();
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedRecord, setExpandedRecord] = useState<number | null>(null);
@@ -382,15 +385,15 @@ export default function RecordsPage() {
   const getTypeColor = (type: string) => {
     switch (type) {
       case "Consultation":
-        return "bg-blue-100 text-blue-800";
+        return "bg-blue-900/40 text-blue-300 border border-blue-700/30";
       case "Lab Report":
-        return "bg-green-100 text-green-800";
+        return "bg-emerald-900/40 text-emerald-300 border border-emerald-700/30";
       case "Prescription":
-        return "bg-purple-100 text-purple-800";
+        return "bg-purple-900/40 text-purple-300 border border-purple-700/30";
       case "Imaging":
-        return "bg-orange-100 text-orange-800";
+        return "bg-amber-900/40 text-amber-300 border border-amber-700/30";
       default:
-        return "bg-gray-100 text-gray-800";
+        return "bg-slate-800 text-slate-300 border border-slate-700/30";
     }
   };
 
@@ -407,27 +410,25 @@ export default function RecordsPage() {
   // Show loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <header className="bg-white dark:bg-gray-800 border-b">
+      <div className="min-h-screen bg-slate-950">
+        <header className="sticky top-0 z-20 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800/50">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-2xl font-bold text-white">
                 Medical Records
               </h1>
-              <div className="flex items-center space-x-2">
-                <Badge className="bg-green-100 text-green-800">
-                  <Shield className="w-3 h-3 mr-1" />
-                  Blockchain Secured
-                </Badge>
-              </div>
+              <Badge className="bg-emerald-900/40 text-emerald-300 border border-emerald-700/30">
+                <Shield className="w-3 h-3 mr-1" />
+                Blockchain Secured
+              </Badge>
             </div>
           </div>
         </header>
         <div className="container mx-auto px-4 py-8">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 text-center">
-            <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-blue-500" />
-            <p className="text-gray-600 dark:text-gray-300">
-              Fetching your medical records...
+          <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-8 text-center">
+            <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-[#004DFF]" />
+            <p className="text-slate-400">
+              Fetching and decrypting your medical records from the blockchain...
             </p>
           </div>
         </div>
@@ -438,35 +439,44 @@ export default function RecordsPage() {
   // Show error state
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <header className="bg-white dark:bg-gray-800 border-b">
+      <div className="min-h-screen bg-slate-950">
+        <header className="sticky top-0 z-20 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800/50">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Medical Records
-              </h1>
-              <div className="flex items-center space-x-2">
-                <Badge className="bg-green-100 text-green-800">
-                  <Shield className="w-3 h-3 mr-1" />
-                  Blockchain Secured
-                </Badge>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.back()}
+                  className="border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800 hover:border-slate-600"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-1" />
+                  Back
+                </Button>
+                <h1 className="text-2xl font-bold text-white">
+                  Medical Records
+                </h1>
               </div>
+              <Badge className="bg-emerald-900/40 text-emerald-300 border border-emerald-700/30">
+                <Shield className="w-3 h-3 mr-1" />
+                Blockchain Secured
+              </Badge>
             </div>
             <div className="mt-4 flex flex-col md:flex-row gap-4">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-5 h-5" />
                 <Input
                   placeholder="Search records, doctors, or conditions..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 bg-slate-800/80 border-slate-700/50 text-white placeholder:text-slate-500 rounded-xl"
                   disabled={true}
                 />
               </div>
               <div className="flex gap-2 w-full md:w-auto">
                 <Button
                   variant="outline"
-                  className="flex-1 md:flex-none md:w-48 justify-center"
+                  className="flex-1 md:flex-none md:w-48 justify-center border-slate-700 text-slate-300 hover:bg-slate-800"
                   onClick={fetchMedicalRecords}
                   disabled={isLoading || !publicKey}
                 >
@@ -484,30 +494,17 @@ export default function RecordsPage() {
           </div>
         </header>
         <div className="container mx-auto px-4 py-8">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 max-w-md mx-auto text-center">
-            <div className="text-red-500 mb-4">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                className="h-12 w-12 mx-auto"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                />
+          <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-8 max-w-md mx-auto text-center">
+            <div className="w-16 h-16 bg-red-900/30 border border-red-700/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
             </div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Error Loading Records
-            </h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">{error}</p>
+            <h2 className="text-xl font-semibold text-white mb-2">Error Loading Records</h2>
+            <p className="text-slate-400 mb-6">{error}</p>
             <button
               onClick={fetchMedicalRecords}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              className="px-4 py-2 bg-[#004DFF] text-white rounded-xl hover:bg-blue-600 transition-colors"
             >
               Try Again
             </button>
@@ -520,35 +517,44 @@ export default function RecordsPage() {
   // Show empty state if no records
   if (medicalRecords.length === 0) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <header className="bg-white dark:bg-gray-800 border-b">
+      <div className="min-h-screen bg-slate-950">
+        <header className="sticky top-0 z-20 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800/50">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                Medical Records
-              </h1>
-              <div className="flex items-center space-x-2">
-                <Badge className="bg-green-100 text-green-800">
-                  <Shield className="w-3 h-3 mr-1" />
-                  Blockchain Secured
-                </Badge>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.back()}
+                  className="border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800 hover:border-slate-600"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-1" />
+                  Back
+                </Button>
+                <h1 className="text-2xl font-bold text-white">
+                  Medical Records
+                </h1>
               </div>
+              <Badge className="bg-emerald-900/40 text-emerald-300 border border-emerald-700/30">
+                <Shield className="w-3 h-3 mr-1" />
+                Blockchain Secured
+              </Badge>
             </div>
             <div className="mt-4 flex flex-col md:flex-row gap-4">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-5 h-5" />
                 <Input
                   placeholder="Search records, doctors, or conditions..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 bg-slate-800/80 border-slate-700/50 text-white placeholder:text-slate-500 rounded-xl"
                   disabled={true}
                 />
               </div>
               <div className="flex gap-2 w-full md:w-auto">
                 <Button
                   variant="outline"
-                  className="flex-1 md:flex-none md:w-48 justify-center"
+                  className="flex-1 md:flex-none md:w-48 justify-center border-slate-700 text-slate-300 hover:bg-slate-800"
                   onClick={fetchMedicalRecords}
                   disabled={isLoading || !publicKey}
                 >
@@ -566,24 +572,24 @@ export default function RecordsPage() {
           </div>
         </header>
         <div className="container mx-auto px-4 py-8">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 max-w-md mx-auto text-center">
-            <div className="bg-blue-100 dark:bg-blue-900/30 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FileText className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+          <div className="bg-slate-900/60 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-8 max-w-md mx-auto text-center">
+            <div className="w-16 h-16 bg-[#004DFF]/15 border border-[#004DFF]/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <FileText className="w-8 h-8 text-[#004DFF]" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            <h2 className="text-2xl font-bold text-white mb-2">
               No Medical Records Found
             </h2>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
-              You don't have any medical records yet. Connect your wallet and
+            <p className="text-slate-400 mb-6">
+              You don&apos;t have any medical records yet. Connect your wallet and
               click the button below to fetch your records from the blockchain.
             </p>
             <button
               onClick={fetchMedicalRecords}
               disabled={!publicKey}
-              className={`px-6 py-3 rounded-md font-medium flex items-center mx-auto ${
+              className={`px-6 py-3 rounded-xl font-medium flex items-center mx-auto ${
                 publicKey
-                  ? "bg-blue-600 text-white hover:bg-blue-700"
-                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                  ? "bg-[#004DFF] text-white hover:bg-blue-600"
+                  : "bg-slate-700 text-slate-400 cursor-not-allowed"
               } transition-colors`}
             >
               <RefreshCw className="w-4 h-4 mr-2" />
@@ -596,36 +602,51 @@ export default function RecordsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-slate-950 relative overflow-hidden">
+      {/* Background Effects */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-[#004DFF]/8 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-blue-600/5 rounded-full blur-[100px]" />
+      </div>
+
       {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b">
+      <header className="sticky top-0 z-20 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800/50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Medical Records
-            </h1>
-            <div className="flex items-center space-x-2">
-              <Badge className="bg-green-100 text-green-800">
-                <Shield className="w-3 h-3 mr-1" />
-                Blockchain Secured
-              </Badge>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.back()}
+                className="border-slate-700 text-slate-200 hover:text-white hover:bg-slate-800 hover:border-slate-600"
+              >
+                <ArrowLeft className="w-4 h-4 mr-1" />
+                Back
+              </Button>
+              <h1 className="text-2xl font-bold text-white">
+                Medical Records
+              </h1>
             </div>
+            <Badge className="bg-emerald-900/40 text-emerald-300 border border-emerald-700/30">
+              <Shield className="w-3 h-3 mr-1" />
+              Blockchain Secured
+            </Badge>
           </div>
 
           {/* Search and Filters */}
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-5 h-5" />
               <Input
                 placeholder="Search records, doctors, or conditions..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-10 bg-slate-800/80 border-slate-700/50 text-white placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-[#004DFF]/30"
               />
             </div>
             <Button
               variant="outline"
-              className="w-full md:w-48 flex items-center justify-center"
+              className="w-full md:w-48 flex items-center justify-center border-slate-700 text-slate-300 hover:bg-slate-800"
               onClick={fetchMedicalRecords}
               disabled={isLoading || !publicKey}
             >
@@ -648,15 +669,15 @@ export default function RecordsPage() {
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="container mx-auto px-4 py-6 relative z-10">
         {/* Records Count */}
         <div className="mb-6 flex items-center justify-between">
-          <p className="text-gray-600 dark:text-gray-300">
+          <p className="text-slate-400">
             Showing {filteredRecords.length} of {medicalRecords.length} records
           </p>
           {searchQuery && (
-            <Badge variant="outline" className="text-blue-600">
-              Search: "{searchQuery}"
+            <Badge variant="outline" className="text-[#004DFF] border-[#004DFF]/30">
+              Search: &quot;{searchQuery}&quot;
             </Badge>
           )}
         </div>
@@ -674,30 +695,30 @@ export default function RecordsPage() {
                 open={expandedRecord === record.id}
                 onOpenChange={() => toggleRecord(record.id)}
               >
-                <Card className="hover:shadow-md transition-shadow">
+                <Card className="bg-slate-900/60 backdrop-blur-xl border-slate-800/50 hover:border-slate-700/50 transition-all rounded-2xl">
                   <CollapsibleTrigger asChild>
                     <CardHeader className="cursor-pointer">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4">
-                          <div className="w-12 h-12 bg-gradient-to-r from-blue-600 to-green-600 rounded-lg flex items-center justify-center">
-                            <FileText className="w-6 h-6 text-white" />
+                          <div className="w-12 h-12 bg-[#004DFF]/15 border border-[#004DFF]/20 rounded-2xl flex items-center justify-center">
+                            <FileText className="w-6 h-6 text-[#004DFF]" />
                           </div>
                           <div>
-                            <CardTitle className="text-lg">
+                            <CardTitle className="text-lg text-white">
                               {record.title}
                             </CardTitle>
                             <div className="flex items-center space-x-4 mt-1">
-                              <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                                <Calendar className="w-4 h-4 mr-1" />
+                              <div className="flex items-center text-sm text-slate-400">
+                                <Calendar className="w-3.5 h-3.5 mr-1" />
                                 {new Date(record.date).toLocaleDateString()}
                               </div>
-                              <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                                <User className="w-4 h-4 mr-1" />
+                              <div className="flex items-center text-sm text-slate-400">
+                                <User className="w-3.5 h-3.5 mr-1" />
                                 {record.doctor}
                               </div>
                               {record.patientId && (
-                                <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                                  <Hash className="w-4 h-4 mr-1" />
+                                <div className="flex items-center text-sm text-slate-400">
+                                  <Hash className="w-3.5 h-3.5 mr-1" />
                                   Patient: {record.patientId}
                                 </div>
                               )}
@@ -710,12 +731,12 @@ export default function RecordsPage() {
                           </Badge>
                           <Badge
                             variant="outline"
-                            className="text-green-600 border-green-600"
+                            className="text-emerald-400 border-emerald-700/30"
                           >
                             {record.status}
                           </Badge>
                           <ChevronDown
-                            className={`w-5 h-5 transition-transform ${
+                            className={`w-5 h-5 text-slate-400 transition-transform ${
                               expandedRecord === record.id ? "rotate-180" : ""
                             }`}
                           />
@@ -731,56 +752,56 @@ export default function RecordsPage() {
                         <div className="space-y-4">
                           {record.patientId && (
                             <div>
-                              <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                              <h4 className="font-semibold text-slate-300 mb-2">
                                 Patient ID
                               </h4>
-                              <p className="text-gray-600 dark:text-gray-300 text-sm">
+                              <p className="text-slate-400 text-sm">
                                 {record.patientId}
                               </p>
                             </div>
                           )}
 
                           <div>
-                            <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                            <h4 className="font-semibold text-slate-300 mb-2">
                               Diagnosis
                             </h4>
-                            <p className="text-gray-600 dark:text-gray-300 text-sm">
+                            <p className="text-slate-400 text-sm">
                               {record.summary}
                             </p>
                           </div>
 
                           <div>
-                            <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                            <h4 className="font-semibold text-slate-300 mb-2">
                               Symptoms
                             </h4>
-                            <p className="text-gray-600 dark:text-gray-300 text-sm">
+                            <p className="text-slate-400 text-sm">
                               {record.symptoms}
                             </p>
                           </div>
 
                           <div>
-                            <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                            <h4 className="font-semibold text-slate-300 mb-2">
                               Treatment Plan
                             </h4>
-                            <p className="text-gray-600 dark:text-gray-300 text-sm">
+                            <p className="text-slate-400 text-sm">
                               {record.treatment}
                             </p>
                           </div>
 
                           <div>
-                            <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                            <h4 className="font-semibold text-slate-300 mb-2">
                               Medications
                             </h4>
-                            <p className="text-gray-600 dark:text-gray-300 text-sm">
+                            <p className="text-slate-400 text-sm">
                               {record.medications}
                             </p>
                           </div>
 
                           <div>
-                            <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                            <h4 className="font-semibold text-slate-300 mb-2">
                               Clinical Notes
                             </h4>
-                            <p className="text-gray-600 dark:text-gray-300 text-sm">
+                            <p className="text-slate-400 text-sm">
                               {record.notes}
                             </p>
                           </div>
@@ -788,22 +809,22 @@ export default function RecordsPage() {
 
                         {/* Blockchain Info */}
                         <div className="space-y-4">
-                          <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                            <h4 className="font-semibold text-gray-900 dark:text-white mb-3 flex items-center">
-                              <Shield className="w-4 h-4 mr-2 text-green-600" />
+                          <div className="bg-slate-800/60 border border-slate-700/30 rounded-xl p-4">
+                            <h4 className="font-semibold text-white mb-3 flex items-center">
+                              <Shield className="w-4 h-4 mr-2 text-emerald-400" />
                               Blockchain Verification
                             </h4>
 
                             <div className="space-y-3 text-sm">
                               <div>
-                                <span className="text-gray-600 dark:text-gray-300">
+                                <span className="text-slate-400">
                                   Transaction:
                                 </span>
                                 <div className="flex items-center justify-between mt-1">
-                                  <code className="text-xs bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded">
+                                  <code className="text-xs bg-slate-700/60 text-slate-300 px-2 py-1 rounded-lg">
                                     {record.blockchainTx.substring(0, 20)}...
                                   </code>
-                                  <Button size="sm" variant="ghost">
+                                  <Button size="sm" variant="ghost" className="text-slate-400 hover:text-white">
                                     <ExternalLink className="w-3 h-3" />
                                   </Button>
                                 </div>
@@ -811,11 +832,11 @@ export default function RecordsPage() {
 
                               {record.recordId && (
                                 <div>
-                                  <span className="text-gray-600 dark:text-gray-300">
+                                  <span className="text-slate-400">
                                     Record ID:
                                   </span>
                                   <div className="mt-1">
-                                    <code className="text-xs bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded">
+                                    <code className="text-xs bg-slate-700/60 text-slate-300 px-2 py-1 rounded-lg">
                                       {record.recordId}
                                     </code>
                                   </div>
@@ -823,8 +844,8 @@ export default function RecordsPage() {
                               )}
 
                               <div className="flex items-center space-x-2 pt-2">
-                                <div className="w-2 h-2 bg-green-500 rounded-full" />
-                                <span className="text-green-600 text-xs">
+                                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+                                <span className="text-emerald-400 text-xs">
                                   Verified on Solana
                                 </span>
                               </div>
@@ -833,11 +854,11 @@ export default function RecordsPage() {
 
                           {/* Actions */}
                           <div className="space-y-2">
-                            <Button className="w-full" variant="outline">
+                            <Button className="w-full border-slate-700 text-slate-300 hover:bg-slate-800" variant="outline">
                               <Eye className="w-4 h-4 mr-2" />
                               View Full Record
                             </Button>
-                            <Button className="w-full" variant="outline">
+                            <Button className="w-full border-slate-700 text-slate-300 hover:bg-slate-800" variant="outline">
                               <Download className="w-4 h-4 mr-2" />
                               Download PDF
                             </Button>

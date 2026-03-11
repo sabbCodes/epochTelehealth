@@ -6,8 +6,10 @@ export interface DoctorProfile {
   first_name: string;
   last_name: string;
   specialization: string;
-  years_of_experience: number;
-  consultation_fee: number | null;
+  years_of_experience: number | null;
+  consultation_fee_30min_video?: number | null;
+  consultation_fee_60min_video?: number | null;
+  consultation_fee_30min_chat?: number | null;
   profile_image: string | null;
   city: string | null;
   country: string | null;
@@ -20,6 +22,7 @@ export interface DoctorProfile {
   bio?: string | null;
   name?: string | null;
   wallet_address?: string | null;
+  availability_schedule?: any;
 }
 
 export async function fetchDoctorById(id: string): Promise<DoctorProfile | null> {
@@ -33,7 +36,9 @@ export async function fetchDoctorById(id: string): Promise<DoctorProfile | null>
         last_name,
         specialization,
         years_of_experience,
-        consultation_fee,
+        consultation_fee_30min_video,
+        consultation_fee_60min_video,
+        consultation_fee_30min_chat,
         profile_image,
         city,
         country,
@@ -41,7 +46,8 @@ export async function fetchDoctorById(id: string): Promise<DoctorProfile | null>
         bio,
         education,
         is_verified,
-        wallet_address
+        wallet_address,
+        availability_schedule
       `)
       .eq('id', id)
       .single();
@@ -71,7 +77,9 @@ export async function fetchDoctors({
         last_name,
         specialization,
         years_of_experience,
-        consultation_fee,
+        consultation_fee_30min_video,
+        consultation_fee_60min_video,
+        consultation_fee_30min_chat,
         profile_image,
         city,
         country,
@@ -79,7 +87,8 @@ export async function fetchDoctors({
         bio,
         education,
         is_verified,
-        wallet_address
+        wallet_address,
+        availability_schedule
       `)
       .eq('is_verified', true)
       .order('first_name', { ascending: true });
@@ -116,6 +125,7 @@ export async function fetchDoctors({
       education: doctor.education || null,
       is_verified: doctor.is_verified || false,
       wallet_address: doctor.wallet_address || null,
+      availability_schedule: doctor.availability_schedule || null,
     }));
   } catch (error) {
     console.error('Unexpected error fetching doctors:', error);

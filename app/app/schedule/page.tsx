@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
@@ -158,9 +158,25 @@ export default function SchedulePage() {
   const doctorName = `Dr. ${formatName(doctor.first_name)} ${formatName(
     doctor.last_name
   )}`;
-  const consultationFee = doctor.consultation_fee || 0;
-  const platformFee = consultationFee * 0.1;
+  // Calculate fees dynamically
+  let consultationFee = 0;
+  if (selectedType) {
+    if (selectedType.id === "video") consultationFee = Number(doctor.consultation_fee_30min_video) || 0;
+    else if (selectedType.id === "extended_video") consultationFee = Number(doctor.consultation_fee_60min_video) || 0;
+    else if (selectedType.id === "text") consultationFee = Number(doctor.consultation_fee_30min_chat) || 0;
+  } else {
+    // Collect non-null, non-undefined, >0 fees as Numbers
+    const fees = [
+      Number(doctor.consultation_fee_30min_video), 
+      Number(doctor.consultation_fee_60min_video), 
+      Number(doctor.consultation_fee_30min_chat)
+    ].filter((f) => !isNaN(f) && f > 0);
+    
+    consultationFee = fees.length > 0 ? Math.min(...fees) : 0;
+  }
+  
   const totalAmount = consultationFee;
+  
   const location = [doctor.city, doctor.country].filter(Boolean).join(", ");
   const experience = doctor.years_of_experience
     ? `${doctor.years_of_experience} years`
@@ -174,27 +190,31 @@ export default function SchedulePage() {
     description: string;
     icon: React.ComponentType<{ className?: string }>;
     duration: number;
+    price: number;
   }> = [
+    {
+      id: "text",
+      name: "Text Chat",
+      description: "Secure async messaging consultation",
+      icon: MessageCircle,
+      duration: 30,
+      price: Number(doctor.consultation_fee_30min_chat) || 0,
+    },
     {
       id: "video",
       name: "Video Call",
       description: "Face-to-face video consultation",
       icon: Video,
       duration: 30,
+      price: Number(doctor.consultation_fee_30min_video) || 0,
     },
     {
       id: "extended_video",
       name: "Extended Video Call",
-      description: "Longer video consultation",
+      description: "Comprehensive 60-minute video session",
       icon: Video,
-      duration: 45,
-    },
-    {
-      id: "text",
-      name: "Text Chat",
-      description: "Secure messaging consultation",
-      icon: MessageCircle,
-      duration: 30,
+      duration: 60,
+      price: Number(doctor.consultation_fee_60min_video) || 0,
     },
   ];
 
@@ -204,65 +224,84 @@ export default function SchedulePage() {
     description: string;
     duration: number;
     icon: React.ComponentType<{ className?: string }>;
+    price: number;
   }) => {
     setSelectedType(type);
   };
 
-  // Generate dates for the next 7 days
+  // Generate dates for the next 7 days based on availability
   const generateDates = () => {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec",
-    ];
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const fullDayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
 
     return Array.from({ length: 7 }, (_, i) => {
       const date = new Date();
       date.setDate(date.getDate() + i);
       const dayName = days[date.getDay()];
+      const fullDayName = fullDayNames[date.getDay()];
       const day = date.getDate();
       const month = months[date.getMonth()];
       const dateString = `${day} ${month}`;
+      
+      const daySchedule = doctor?.availability_schedule?.[fullDayName];
+      const isOpen = daySchedule ? daySchedule.isOpen : true; // default true if no schedule defined
 
       return {
         value: dateString,
         label: i === 0 ? "Today" : i === 1 ? "Tomorrow" : dayName,
         date: dateString,
         dateObj: new Date(date),
+        fullDayName,
+        isOpen
       };
     });
   };
 
   const dates = generateDates();
 
-  // Generate time slots from 8:00 AM to 6:00 PM with 30-minute intervals
+  // Generate time slots based on the selected date's schedule
   const generateTimeSlots = () => {
+    if (!selectedDate) return [];
+    
+    // Find the full day name from the selected date string
+    const dateObj = dates.find(d => d.value === selectedDate);
+    if (!dateObj || !dateObj.isOpen) return [];
+    
+    const daySchedule = doctor?.availability_schedule?.[dateObj.fullDayName];
+    
     const slots = [];
-    for (let hour = 8; hour < 18; hour++) {
-      slots.push({
-        time: `${hour % 12 || 12}:00 ${hour >= 12 ? "PM" : "AM"}`,
-        value: `${hour.toString().padStart(2, "0")}:00`,
-      });
+    
+    // Default 8-5 if no schedule
+    let startHour = 8, startMin = 0;
+    let endHour = 17, endMin = 0;
+    
+    if (daySchedule && daySchedule.start && daySchedule.end) {
+       const startParts = daySchedule.start.split(":");
+       startHour = parseInt(startParts[0]);
+       startMin = parseInt(startParts[1]);
+       
+       const endParts = daySchedule.end.split(":");
+       endHour = parseInt(endParts[0]);
+       endMin = parseInt(endParts[1]);
+    }
 
-      // Add :30 slot (e.g., 8:30, 9:30, etc.)
-      if (hour < 17) {
-        // Don't add 5:30 PM if end time is 6:00 PM
-        slots.push({
-          time: `${hour % 12 || 12}:30 ${hour >= 12 ? "PM" : "AM"}`,
-          value: `${hour.toString().padStart(2, "0")}:30`,
-        });
+    let currentHour = startHour;
+    let currentMin = startMin;
+    
+    while (currentHour < endHour || (currentHour === endHour && currentMin < endMin)) {
+      slots.push({
+        time: `${currentHour % 12 || 12}:${currentMin === 0 ? "00" : "30"} ${currentHour >= 12 ? "PM" : "AM"}`,
+        value: `${currentHour.toString().padStart(2, "0")}:${currentMin === 0 ? "00" : "30"}`,
+      });
+      
+      currentMin += 30;
+      if (currentMin >= 60) {
+        currentMin = 0;
+        currentHour += 1;
       }
     }
+    
     return slots;
   };
 
@@ -851,457 +890,325 @@ export default function SchedulePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center">
-            <Link href="/doctors">
-              <Button variant="ghost" size="sm" className="mr-4">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
-            </Link>
-            <h1 className="text-xl font-bold">Schedule Appointment</h1>
-          </div>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white pb-20 lg:pb-0">
+      {/* Hero Section */}
+      <div className="bg-white dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#004DFF]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-emerald-500/5 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3 pointer-events-none" />
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+          <button 
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white font-medium text-sm transition-colors mb-4 cursor-pointer outline-none"
+          >
+            <ArrowLeft size={16} /> Back
+          </button>
+          <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2">
+            Schedule Appointment
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 max-w-2xl">
+            Book a secure, private consultation with your physician. Select the consultation type, date, and time below.
+          </p>
         </div>
-      </header>
+      </div>
 
-      <div className="container mx-auto px-4 py-6 max-w-6xl">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid lg:grid-cols-3 gap-8">
-          {/* Doctor Information */}
+          {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle>Doctor Information</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-start space-x-4">
-                    <div className="relative">
-                      <Avatar className="w-20 h-20">
-                        <AvatarImage
-                          src={doctor.profile_image || "/placeholder.svg"}
-                          alt={`${formatName(doctor.first_name)} ${formatName(
-                            doctor.last_name
-                          )}`}
-                        />
-                        <AvatarFallback>
-                          {`${formatName(
-                            doctor.first_name?.[0] || ""
-                          )}${formatName(
-                            doctor.last_name?.[0] || ""
-                          )}`.toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      {doctor.is_verified && (
-                        <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
-                          <CheckCircle className="w-4 h-4 text-white" />
+            
+            {/* Doctor Info */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+              <div className="bg-white dark:bg-slate-800/80 rounded-3xl p-6 sm:p-8 shadow-sm border border-slate-100 dark:border-slate-700/50 backdrop-blur-xl">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                  <div className="relative shrink-0">
+                    <Avatar className="w-24 h-24 sm:w-32 sm:h-32 shadow-lg border-4 border-white dark:border-slate-700">
+                      <AvatarImage src={doctor.profile_image || "/placeholder.svg"} className="object-cover" />
+                      <AvatarFallback className="text-2xl bg-slate-100 dark:bg-slate-800">
+                        {`${formatName(doctor.first_name?.[0] || "")}${formatName(doctor.last_name?.[0] || "")}`.toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    {doctor.is_verified && (
+                      <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-[#004DFF] rounded-full flex items-center justify-center border-4 border-white dark:border-slate-800">
+                        <CheckCircle className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 text-center sm:text-left">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-2">
+                      <h2 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300">
+                        {doctorName}
+                      </h2>
+                      <span className="inline-flex items-center justify-center px-2.5 py-1 bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 text-xs font-bold uppercase tracking-wider rounded-full">
+                        Verified
+                      </span>
+                    </div>
+                    <p className="text-[#004DFF] font-semibold text-base mb-4">
+                      {doctor.specialization || "General Practitioner"}
+                    </p>
+                    
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-6 gap-y-3 text-sm text-slate-600 dark:text-slate-300 mb-4">
+                      {location && (
+                        <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900/50 px-3 py-1.5 rounded-full">
+                          <MapPin className="w-4 h-4 shrink-0 text-slate-400" />
+                          <span>{location}</span>
                         </div>
                       )}
+                      <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900/50 px-3 py-1.5 rounded-full">
+                        <Star className="w-4 h-4 shrink-0 text-amber-400 fill-amber-400" />
+                        <span className="font-medium text-slate-700 dark:text-slate-200">{doctor.rating || "5.0"}</span>
+                        <span>({doctor.reviews_count || 0} reviews)</span>
+                      </div>
                     </div>
-
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-2">
-                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                          {doctorName}
-                        </h2>
-                        <Badge className="bg-green-100 text-green-800">
-                          Verified
-                        </Badge>
-                      </div>
-
-                      <p className="text-blue-600 dark:text-blue-400 font-medium mb-2">
-                        {doctor.specialization || "General Practitioner"}
+                    <div className="space-y-4 max-w-2xl">
+                      <p className="text-slate-600 dark:text-slate-300 text-sm leading-relaxed">
+                        {doctor.bio || "No biography available."}
                       </p>
-
-                      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-gray-600 dark:text-gray-300 mb-3">
-                        {location && (
-                          <div className="flex items-center">
-                            <MapPin className="w-4 h-4 mr-1 flex-shrink-0" />
-                            <span>{location}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center">
-                          <Star className="w-4 h-4 mr-1 text-yellow-400 fill-current flex-shrink-0" />
-                          <span>
-                            {doctor.rating || "N/A"}
-                            {doctor.reviews_count
-                              ? `(${doctor.reviews_count} reviews)`
-                              : ""}
-                          </span>
-                        </div>
-                        <div className="flex items-center">
-                          <Calendar className="w-4 h-4 mr-1 text-gray-400 flex-shrink-0" />
-                          <span>{experience} experience</span>
-                        </div>
-                      </div>
-
-                      <p className="text-gray-600 dark:text-gray-300 text-sm mb-3">
-                        {doctor.bio}
-                      </p>
-
-                      <div className="space-y-3">
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 pt-4 border-t border-slate-100 dark:border-slate-700/50">
+                        {/* Education */}
                         <div>
-                          <div className="flex items-center mb-1">
-                            <GraduationCap className="w-4 h-4 mr-2 text-gray-400" />
-                            <span className="text-sm font-medium text-gray-900 dark:text-white">
-                              Education & Certifications
-                            </span>
+                          <div className="flex items-center gap-2 mb-2 text-slate-700 dark:text-slate-200">
+                            <GraduationCap className="w-4 h-4 text-slate-400" />
+                            <span className="text-xs font-bold uppercase tracking-wider">Education</span>
                           </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-300 ml-6">
-                            {doctor.education ? (
-                              <ul className="space-y-2">
-                                {(() => {
-                                  const educationItems = Array.isArray(
-                                    doctor.education
-                                  )
-                                    ? doctor.education.flatMap((edu: string) =>
-                                        edu
-                                          .split(",")
-                                          .map((item: string) => item.trim())
-                                          .filter(Boolean)
-                                      )
-                                    : typeof doctor.education === "string"
-                                    ? doctor.education
-                                        .split(",")
-                                        .map((item: string) => item.trim())
-                                        .filter(Boolean)
-                                    : [];
-
-                                  return educationItems.length > 0 ? (
-                                    educationItems.map(
-                                      (item: string, index: number) => (
-                                        <li
-                                          key={index}
-                                          className="flex items-start"
-                                        >
-                                          <span className="mr-2">•</span>
-                                          <span>{item}</span>
-                                        </li>
-                                      )
-                                    )
-                                  ) : (
-                                    <p className="text-muted-foreground italic">
-                                      No education information available
-                                    </p>
-                                  );
-                                })()}
-                              </ul>
-                            ) : (
-                              <p className="text-muted-foreground italic">
-                                No education information available
-                              </p>
-                            )}
-                          </div>
+                          {doctor.education ? (
+                            <ul className="space-y-1">
+                              {(() => {
+                                const edus = Array.isArray(doctor.education) ? doctor.education : [doctor.education];
+                                const flattened = edus.flatMap(e => (typeof e === 'string' ? e.split(',') : [e])).map(e => String(e).trim()).filter(Boolean);
+                                if (flattened.length === 0) return <li className="text-sm text-slate-500 italic">Not specified</li>;
+                                return flattened.map((item, idx) => (
+                                  <li key={idx} className="text-sm text-slate-600 dark:text-slate-400 flex items-start gap-2">
+                                    <span className="text-[#004DFF]">•</span>
+                                    <span>{item}</span>
+                                  </li>
+                                ));
+                              })()}
+                            </ul>
+                          ) : (
+                            <span className="text-sm text-slate-500 italic">Not specified</span>
+                          )}
                         </div>
-                        {languages && (
-                          <div className="flex items-center">
-                            <MessageCircle className="w-4 h-4 mr-1 text-gray-400 flex-shrink-0" />
-                            <span>
-                              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                Speaks:
-                              </span>{" "}
-                              {languages}
-                            </span>
+                        
+                        {/* Languages */}
+                        <div>
+                          <div className="flex items-center gap-2 mb-2 text-slate-700 dark:text-slate-200">
+                            <MessageCircle className="w-4 h-4 text-slate-400" />
+                            <span className="text-xs font-bold uppercase tracking-wider">Languages</span>
                           </div>
-                        )}
+                          <p className="text-sm text-slate-600 dark:text-slate-400">{languages}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             </motion.div>
 
             {/* Consultation Type */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle>Consultation Type</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid md:grid-cols-3 gap-4">
-                    {consultationTypes.map((type) => {
-                      const Icon = type.icon;
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+              <div className="bg-white dark:bg-slate-800/80 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50 backdrop-blur-xl">
+                <h3 className="text-lg font-bold mb-4 text-slate-900 dark:text-white">Select Consultation Type</h3>
+                <div className="grid sm:grid-cols-3 gap-4">
+                  {consultationTypes.map((type) => {
+                    const Icon = type.icon;
+                    const isSelected = selectedType?.id === type.id;
+                    return (
+                      <button
+                        key={type.id}
+                        onClick={() => handleConsultationTypeSelect(type)}
+                        type="button"
+                        className={`p-4 rounded-2xl border-2 transition-all duration-300 text-left outline-none flex flex-col ${
+                          isSelected 
+                            ? "border-[#004DFF] bg-[#004DFF]/5 shadow-[0_0_20px_rgba(0,77,255,0.15)] ring-2 ring-[#004DFF]/20" 
+                            : "border-slate-100 dark:border-slate-700/50 hover:border-blue-200 dark:hover:border-slate-600 hover:shadow-md"
+                        }`}
+                      >
+                        <div className="flex justify-between items-start mb-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                            isSelected ? "bg-[#004DFF] text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
+                          }`}>
+                            <Icon className="w-5 h-5" />
+                          </div>
+                          {isSelected && <CheckCircle className="w-5 h-5 text-[#004DFF]" />}
+                        </div>
+                        <h4 className={`font-bold ${isSelected ? "text-slate-900 dark:text-white" : "text-slate-700 dark:text-slate-200"}`}>{type.name}</h4>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 mb-2 line-clamp-2 leading-relaxed">{type.description}</p>
+                        <div className="mt-auto flex justify-between items-center w-full">
+                          <span className="inline-flex px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 text-xs font-medium text-slate-600 dark:text-slate-300">
+                            {type.duration} mins
+                          </span>
+                          <span className="font-bold text-slate-900 dark:text-white">
+                            ${type.price} USDC
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Date & Time */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
+              <div className="bg-white dark:bg-slate-800/80 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50 backdrop-blur-xl">
+                <h3 className="text-lg font-bold mb-4 text-slate-900 dark:text-white">Date & Time</h3>
+                
+                <div className="mb-6">
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                    {dates.map((date) => {
+                      const isSelected = selectedDate === date.value;
                       return (
-                        <div
-                          key={type.id}
-                          onClick={() => handleConsultationTypeSelect(type)}
-                          className={`p-4 outline-none border-2 rounded-lg cursor-pointer transition-all ${
-                            selectedType?.id === type.id
-                              ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
-                              : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
+                        <button
+                          key={date.value}
+                          type="button"
+                          onClick={() => { setSelectedDate(date.value); setSelectedTime(""); }}
+                          disabled={!date.isOpen}
+                          className={`p-3 outline-none flex flex-col items-center justify-center border-2 rounded-2xl transition-all duration-300 ${
+                            isSelected
+                              ? "border-[#004DFF] bg-[#004DFF]/5 text-[#004DFF] shadow-[0_0_15px_rgba(0,77,255,0.1)]"
+                              : date.isOpen
+                              ? "border-slate-100 dark:border-slate-700/50 hover:border-blue-200 dark:hover:border-slate-600 cursor-pointer"
+                              : "border-slate-50 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 opacity-50 cursor-not-allowed"
                           }`}
                         >
-                          <div className="flex items-center space-x-3 mb-2">
-                            <div
-                              className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                                selectedType?.id === type.id
-                                  ? "bg-blue-600 text-white"
-                                  : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-                              }`}
-                            >
-                              <Icon className="w-4 h-4" />
-                            </div>
-                            <h3 className="font-medium text-gray-900 dark:text-white">
-                              {type.name}
-                            </h3>
-                          </div>
-                          <p className="text-sm text-gray-600 dark:text-gray-300 mb-1">
-                            {type.description}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {type.duration} minutes
-                          </p>
-                        </div>
+                          <span className={`text-xs uppercase tracking-wider font-bold mb-1 ${
+                            isSelected ? "text-[#004DFF]" : "text-slate-500 dark:text-slate-400"
+                          }`}>
+                            {date.label}
+                          </span>
+                          <span className={`font-extrabold ${isSelected ? "text-[#004DFF]" : "text-slate-900 dark:text-white"}`}>
+                            {date.date.split(' ')[0]}
+                          </span>
+                          <span className={`text-xs font-medium ${isSelected ? "text-[#004DFF]/70" : "text-slate-500"}`}>
+                            {date.date.split(' ')[1]}
+                          </span>
+                        </button>
                       );
                     })}
                   </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+                </div>
 
-            {/* Date & Time Selection */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle>Select Date & Time</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Date Selection */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
-                      Preferred Date
-                    </label>
-                    <div className="grid grid-cols-3 gap-3">
-                      {dates.map((date) => (
-                        <button
-                          key={date.value}
-                          onClick={() => {
-                            setSelectedDate(date.value);
-                            setSelectedTime(""); // Reset time when date changes
-                          }}
-                          className={`p-3 outline-none text-center border-2 rounded-lg transition-all ${
-                            selectedDate === date.value
-                              ? "border-blue-600 bg-blue-50 dark:bg-blue-900/20"
-                              : "border-gray-200 dark:border-gray-700 hover:border-gray-300"
-                          }`}
-                        >
-                          <div className="font-medium text-gray-900 dark:text-white">
-                            {date.label}
-                          </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-300">
-                            {date.date}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Time Selection */}
+                <AnimatePresence>
                   {selectedDate && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
-                        Available Times
-                      </label>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4 max-h-60 overflow-y-auto p-2">
-                        {timeSlots.map((slot) => (
-                          <button
-                            key={slot.value}
-                            type="button"
-                            onClick={() => setSelectedTime(slot.time)}
-                            className={`p-2 outline-none text-sm text-center rounded border ${
-                              selectedTime === slot.time
-                                ? "border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:border-blue-600 dark:text-blue-300"
-                                : "border-gray-200 hover:border-gray-300 dark:border-gray-700 dark:hover:border-gray-600"
-                            }`}
-                          >
-                            {slot.time}
-                          </button>
-                        ))}
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                      <div className="pt-2">
+                        <h4 className="text-sm font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">Available Slots</h4>
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 max-h-[220px] overflow-y-auto pr-2 custom-scrollbar">
+                          {timeSlots.length === 0 ? (
+                            <div className="col-span-full py-6 text-center text-slate-500 italic text-sm">No availability on this date</div>
+                          ) : timeSlots.map((slot) => {
+                            const isSelected = selectedTime === slot.time;
+                            return (
+                              <button
+                                key={slot.value}
+                                type="button"
+                                onClick={() => setSelectedTime(slot.time)}
+                                className={`py-2.5 px-3 outline-none text-sm font-semibold text-center rounded-xl border-2 transition-all ${
+                                  isSelected
+                                    ? "border-[#004DFF] bg-[#004DFF] text-white shadow-lg shadow-[#004DFF]/30"
+                                    : "border-slate-100 dark:border-slate-700/50 text-slate-700 dark:text-slate-300 hover:border-blue-200 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                }`}
+                              >
+                                {slot.time}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
+                    </motion.div>
                   )}
-                </CardContent>
-              </Card>
+                </AnimatePresence>
+              </div>
             </motion.div>
 
-            {/* Symptoms/Reason */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle>Note (Optional)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Textarea
-                    placeholder="Please describe your symptoms or reason for consultation..."
-                    value={symptoms}
-                    onChange={(e) => setSymptoms(e.target.value)}
-                    className="min-h-[100px] outline-none"
-                  />
-                  <p className="text-sm text-gray-500 mt-2">
-                    This helps the doctor prepare for your consultation and
-                    provide better care.
-                  </p>
-                </CardContent>
-              </Card>
+            {/* Note */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+              <div className="bg-white dark:bg-slate-800/80 rounded-3xl p-6 shadow-sm border border-slate-100 dark:border-slate-700/50 backdrop-blur-xl">
+                <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-slate-900 dark:text-white">
+                  <MessageCircle className="w-5 h-5 text-[#004DFF]" />
+                  Add a Note <span className="text-slate-400 text-sm font-normal">(Optional)</span>
+                </h3>
+                <Textarea
+                  placeholder="Describe your symptoms to help the doctor prepare..."
+                  value={symptoms}
+                  onChange={(e) => setSymptoms(e.target.value)}
+                  className="min-h-[140px] resize-none outline-none focus:ring-2 focus:ring-[#004DFF]/20 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 rounded-2xl text-base p-4 transition-all"
+                />
+              </div>
             </motion.div>
+
           </div>
 
-          {/* Booking Summary */}
+          {/* Right Column (Summary) */}
           <div className="space-y-6">
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4 }}
-            >
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Calendar className="w-5 h-5 mr-2 text-blue-600" />
-                    Booking Summary
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-300">
-                        Doctor:
-                      </span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {doctorName}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-300">
-                        Specialty:
-                      </span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {doctor.specialization}
-                      </span>
-                    </div>
-                    {selectedDate && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-300">
-                          Date:
-                        </span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {dates.find((d) => d.value === selectedDate)?.label} (
-                          {dates.find((d) => d.value === selectedDate)?.date})
-                        </span>
-                      </div>
-                    )}
-                    {selectedTime && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-300">
-                          Time:
-                        </span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {selectedTime}
-                        </span>
-                      </div>
-                    )}
-                    {selectedType && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600 dark:text-gray-300">
-                          Type:
-                        </span>
-                        <span className="font-medium text-gray-900 dark:text-white">
-                          {selectedType.name}
-                        </span>
-                      </div>
-                    )}
+            <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.4 }} className="sticky top-24">
+              <div className="bg-white dark:bg-slate-800/80 rounded-3xl p-6 shadow-xl shadow-slate-200/40 dark:border-slate-700/50 dark:shadow-none border border-slate-100 backdrop-blur-xl">
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-slate-900 dark:text-white">
+                  <Calendar className="w-5 h-5 text-[#004DFF]" />
+                  Booking Summary
+                </h3>
+
+                <div className="space-y-4 text-sm mb-6">
+                  <div className="flex justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                    <span className="text-slate-500 dark:text-slate-400">Date</span>
+                    <span className="font-bold text-right text-slate-900 dark:text-white">
+                      {selectedDate ? `${dates.find((d) => d.value === selectedDate)?.label}, ${selectedDate}` : "—"}
+                    </span>
                   </div>
+                  <div className="flex justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                    <span className="text-slate-500 dark:text-slate-400">Time</span>
+                    <span className="font-bold text-slate-900 dark:text-white">{selectedTime || "—"}</span>
+                  </div>
+                  <div className="flex justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50">
+                    <span className="text-slate-500 dark:text-slate-400">Type</span>
+                    <span className="font-bold text-right text-slate-900 dark:text-white">
+                      {selectedType ? `${selectedType.name} (${selectedType.duration}m)` : "—"}
+                    </span>
+                  </div>
+                </div>
 
-                  <Separator />
+                <Separator className="my-6 dark:bg-slate-700/50 border-slate-100" />
 
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-300">
-                        Consultation Fee:
-                      </span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {consultationFee.toFixed(2)} USDC
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600 dark:text-gray-300">
-                        Platform Fee (10%):
-                      </span>
-                      <span className="font-medium text-gray-900 dark:text-white">
-                        {platformFee.toFixed(2)} USDC
-                      </span>
-                    </div>
-                    <Separator />
-                    <div className="flex justify-between text-lg font-bold">
-                      <span>You Pay</span>
-                      <span>{totalAmount.toFixed(2)} USDC</span>
-                    </div>
-                    <div className="text-center text-sm text-gray-500">
-                      Doctor receives:{" "}
-                      {(consultationFee - platformFee).toFixed(2)} USDC
+                <div className="space-y-3 mb-6">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-slate-500 dark:text-slate-400">Consultation Fee</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{consultationFee.toFixed(2)} USDC</span>
+                  </div>
+                  <div className="pt-3 mt-3 border-t border-slate-100 dark:border-slate-700/50">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-base font-bold text-slate-900 dark:text-white">Total</span>
+                      <span className="text-2xl font-black text-[#004DFF]">{totalAmount.toFixed(2)} <span className="text-sm">USDC</span></span>
                     </div>
                   </div>
+                </div>
 
-                  <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Shield className="w-4 h-4 text-blue-600" />
-                      <span className="text-sm font-medium text-blue-800 dark:text-blue-300">
-                        Secure Payment
-                      </span>
-                    </div>
-                    <p className="text-xs text-blue-700 dark:text-blue-400">
-                      Payment is held in escrow and released to the doctor only
-                      after consultation completion.
-                    </p>
+                <div className="bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl p-4 mb-6">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Shield className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="text-sm font-bold text-emerald-800 dark:text-emerald-300">Secure Escrow</span>
                   </div>
+                  <p className="text-xs text-emerald-700/80 dark:text-emerald-400/80 leading-relaxed">
+                    Funds stay locked until consultation complete.
+                  </p>
+                </div>
 
-                  {isCreatingRoom && (
-                    <div className="mb-3 p-3 rounded bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300 flex items-center justify-center">
-                      <div className="w-4 h-4 border-2 border-yellow-800 border-t-transparent rounded-full animate-spin mr-2" />
-                      Creating meeting...
+                <Button
+                  onClick={handleBooking}
+                  disabled={!selectedDate || !selectedTime || !selectedType || isProcessing}
+                  className="w-full bg-[#004DFF] hover:bg-blue-700 text-white shadow-lg shadow-[#004DFF]/25 font-bold h-14 rounded-2xl text-base transition-all disabled:opacity-50 disabled:shadow-none outline-none"
+                >
+                  {isProcessing ? (
+                    <div className="flex items-center gap-2">
+                       <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                       Processing...
                     </div>
+                  ) : (
+                    "Confirm Appointment"
                   )}
-
-                  <Button
-                    onClick={handleBooking}
-                    disabled={
-                      !selectedDate ||
-                      !selectedTime ||
-                      !selectedType ||
-                      isProcessing
-                    }
-                    className="w-full bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 outline-none"
-                  >
-                    {isProcessing ? (
-                      <div className="flex items-center">
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                        Processing...
-                      </div>
-                    ) : (
-                      <>
-                        <CreditCard className="w-4 h-4 mr-2" />
-                        Schedule Now
-                      </>
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
+                </Button>
+              </div>
             </motion.div>
           </div>
         </div>

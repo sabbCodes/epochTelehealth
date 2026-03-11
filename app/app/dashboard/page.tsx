@@ -1,42 +1,47 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import {
   Calendar,
   Clock,
-  FileText,
   Video,
   Pill,
-  Bell,
   Wallet,
   Plus,
-  ChevronRight,
   LogOut,
   MessageCircle,
   MessageSquare,
+  LayoutDashboard,
+  Settings,
+  X,
+  Menu,
+  Activity,
+  Search,
+  Shield,
+  Heart,
+  Stethoscope,
+  XCircle,
+  FileText,
 } from "lucide-react";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { ThemeToggle } from "@/components/theme-toggle";
 import Link from "next/link";
 import Image from "next/image";
 import { useUserProfile, getInitials } from "@/hooks/useUserProfile";
 import { supabase } from "@/lib/supabase";
 import { formatName } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { NotificationDropdown } from "@/components/NotificationDropdown";
+
+// ---- Types ----
 
 interface Appointment {
   id: string;
@@ -50,27 +55,136 @@ interface Appointment {
   status: string;
 }
 
-function DashboardSkeleton() {
+// ---- Sidebar Item ----
+
+function SidebarItem({
+  icon: Icon,
+  label,
+  active = false,
+  onClick,
+  href,
+}: {
+  icon: React.ElementType;
+  label: string;
+  active?: boolean;
+  onClick?: () => void;
+  href?: string;
+}) {
+  const cls = `w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+    active
+      ? "bg-[#004DFF] text-white shadow-none"
+      : "text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white"
+  }`;
+  if (href) {
+    return (
+      <Link href={href} className={cls}>
+        <Icon size={20} />
+        <span className="font-medium">{label}</span>
+      </Link>
+    );
+  }
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-8 w-64" />
-        <div className="flex items-center space-x-4">
-          <Skeleton className="h-10 w-10 rounded-full" />
-          <Skeleton className="h-10 w-10 rounded-full" />
-          <Skeleton className="h-10 w-10 rounded-full" />
-        </div>
-      </div>
-      <Skeleton className="h-24 w-full rounded-lg" />
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Skeleton className="h-32 rounded-lg" />
-        <Skeleton className="h-32 rounded-lg" />
-        <Skeleton className="h-32 rounded-lg" />
-      </div>
-      <Skeleton className="h-64 w-full rounded-lg" />
-    </div>
+    <button onClick={onClick} className={cls}>
+      <Icon size={20} />
+      <span className="font-medium">{label}</span>
+    </button>
   );
 }
+
+// ---- Appointment Row ----
+
+function AppointmentRow({
+  appointment,
+  router,
+  onCancel,
+}: {
+  appointment: Appointment;
+  router: ReturnType<typeof useRouter>;
+  onCancel: (id: string) => void;
+}) {
+  const statusColor: Record<string, string> = {
+    confirmed: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400",
+    pending: "bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400",
+    cancelled: "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400",
+    completed: "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300",
+  };
+
+  return (
+    <motion.div
+      whileHover={{ x: 2 }}
+      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors rounded-xl gap-3"
+    >
+      <div className="flex items-center space-x-4">
+        <Avatar className="h-11 w-11 border-2 border-white dark:border-slate-700 shadow-sm">
+          <AvatarImage src={appointment.avatar || ""} />
+          <AvatarFallback className="bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-bold text-sm">
+            {appointment.doctor.split(" ")[1]?.[0] || "D"}
+          </AvatarFallback>
+        </Avatar>
+        <div>
+          <h4 className="font-bold text-sm text-slate-900 dark:text-white">
+            {appointment.doctor}
+          </h4>
+          <p className="text-xs font-medium text-[#004DFF] dark:text-blue-400 mb-0.5">
+            {appointment.specialty}
+          </p>
+          <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+            <span className="flex items-center gap-1">
+              <Calendar size={12} />
+              {appointment.date}
+            </span>
+            <span className="flex items-center gap-1">
+              <Clock size={12} />
+              {appointment.time}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 self-start sm:self-auto">
+        <Badge
+          variant="secondary"
+          className={`text-[10px] font-bold uppercase px-2.5 py-1 ${statusColor[appointment.status] || statusColor.pending}`}
+        >
+          {appointment.status}
+        </Badge>
+        {(appointment.status === "confirmed" || appointment.status === "pending") && (
+          <button
+            onClick={() => {
+              if (appointment.type === "text") {
+                router.push(`/chat/patient?appointmentId=${appointment.id}`);
+              } else {
+                router.push(`/video-call?appointmentId=${appointment.id}&role=patient`);
+              }
+            }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              appointment.type === "video" || appointment.type === "extended_video"
+                ? "bg-[#004DFF] text-white hover:bg-blue-700"
+                : "border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700"
+            }`}
+          >
+            {appointment.type === "video" || appointment.type === "extended_video" ? (
+              <><Video size={13} /> Join</>
+            ) : (
+              <><MessageCircle size={13} /> Chat</>
+            )}
+          </button>
+        )}
+        {appointment.status !== "cancelled" && appointment.status !== "completed" && (
+          <button
+            onClick={() => onCancel(appointment.id)}
+            title="Cancel appointment"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition"
+          >
+            <XCircle size={13} /> Cancel
+          </button>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+// ---- Main Dashboard ----
 
 export default function Dashboard() {
   const { userProfile, loading, error, isAuthenticated } = useUserProfile();
@@ -79,13 +193,27 @@ export default function Dashboard() {
   const [isLoadingBalance, setIsLoadingBalance] = useState<boolean>(false);
   const [upcomingAppointments, setUpcomingAppointments] = useState<Appointment[]>([]);
   const [isLoadingAppointments, setIsLoadingAppointments] = useState<boolean>(true);
+  const [isSidebarOpen, setSidebarOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState("Dashboard");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [chartData, setChartData] = useState<{ day: string; consultations: number }[]>([]);
   const { toast } = useToast();
   const router = useRouter();
+
+  // Responsive sidebar
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 1024) setSidebarOpen(false);
+      else setSidebarOpen(true);
+    };
+    window.addEventListener("resize", handleResize);
+    handleResize();
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Handle avatar image loading state
   useEffect(() => {
     if (userProfile?.profile_image) {
-      // Ensure the URL is properly formatted
       const imageUrl = userProfile.profile_image.startsWith("http")
         ? userProfile.profile_image
         : `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/profile_images/${userProfile.profile_image}`;
@@ -93,126 +221,84 @@ export default function Dashboard() {
       const img = new window.Image();
       img.src = imageUrl;
       img.onload = () => setAvatarSrc(imageUrl);
-      img.onerror = () => {
-        console.error("Failed to load profile image:", imageUrl);
-        setAvatarSrc(undefined);
-      };
+      img.onerror = () => setAvatarSrc(undefined);
     } else {
       setAvatarSrc(undefined);
     }
   }, [userProfile?.profile_image]);
 
-  // Fetch wallet balance when user profile is loaded
+  // Fetch wallet balance
   useEffect(() => {
     const fetchWalletBalance = async () => {
       if (!userProfile?.wallet_address) return;
-
       setIsLoadingBalance(true);
       try {
-        // Connect to Solana devnet
         const connection = new Connection("https://api.devnet.solana.com");
         const walletAddress = new PublicKey(userProfile.wallet_address);
-
-        // USDC mint address on devnet
-        const USDC_MINT = new PublicKey(
-          "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
-        );
-
-        // Get associated token account
-        const tokenAccount = await getAssociatedTokenAddress(
-          USDC_MINT,
-          walletAddress
-        );
-
-        // Get token account balance
-        const balance = await connection.getTokenAccountBalance(tokenAccount);
-
-        // Convert balance to USDC (6 decimals)
-        const usdcBalance = (parseInt(balance.value.amount) / 10 ** 6).toFixed(
-          2
-        );
-        setWalletBalance(usdcBalance);
-      } catch (error) {
-        console.error("Error fetching wallet balance:", error);
+        const USDC_MINT = new PublicKey("4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU");
+        try {
+          const tokenAccount = await getAssociatedTokenAddress(USDC_MINT, walletAddress);
+          const balance = await connection.getTokenAccountBalance(tokenAccount);
+          setWalletBalance((parseInt(balance.value.amount) / 10 ** 6).toFixed(2));
+        } catch {
+          setWalletBalance("0.00");
+        }
+      } catch {
         setWalletBalance("0.00");
       } finally {
         setIsLoadingBalance(false);
       }
     };
-
     fetchWalletBalance();
   }, [userProfile?.wallet_address]);
 
   // Fetch upcoming appointments
   useEffect(() => {
     const fetchAppointments = async () => {
-      if (!userProfile?.id) {
-        console.log('No user profile ID available');
-        return;
-      }
-      
+      if (!userProfile?.id) return;
       try {
-        console.log('Fetching appointments for user ID:', userProfile.id);
         setIsLoadingAppointments(true);
-        
-        // Fetch schedules for the current user (patient)
         const { data: schedules, error: schedulesError } = await supabase
-          .from('schedules')
-          .select('*')
-          .eq('patient_id', userProfile.id)
-          .gte('scheduled_date', new Date().toISOString().split('T')[0])
-          .order('scheduled_date', { ascending: true })
-          .order('start_time', { ascending: true })
+          .from("schedules")
+          .select("*")
+          .eq("patient_id", userProfile.id)
+          .gte("scheduled_date", new Date().toISOString().split("T")[0])
+          .in("status", ["scheduled", "pending", "confirmed"])
+          .order("scheduled_date", { ascending: true })
+          .order("start_time", { ascending: true })
           .limit(5);
 
-        if (schedulesError) {
-          console.error('Error fetching schedules:', schedulesError);
-          throw schedulesError;
-        }
-        
-        console.log('Fetched schedules:', schedules);
-
-        // Fetch doctor details for each schedule
+        if (schedulesError) throw schedulesError;
         if (!schedules || schedules.length === 0) {
-          console.log('No upcoming appointments found');
           setUpcomingAppointments([]);
           return;
         }
 
         const appointmentsWithDoctors = await Promise.all(
           schedules.map(async (schedule) => {
-            console.log('Processing schedule:', schedule);
             const { data: doctor, error: doctorError } = await supabase
-              .from('doctor_profiles')
-              .select('*')
-              .eq('id', schedule.doctor_id)
+              .from("doctor_profiles")
+              .select("*")
+              .eq("id", schedule.doctor_id)
               .single();
 
-            if (doctorError) {
-              console.error('Error fetching doctor:', doctorError);
-              throw doctorError;
-            }
+            if (doctorError) throw doctorError;
 
-            // Combine date and time for display
-            const appointmentDateTime = new Date(
-              `${schedule.scheduled_date}T${schedule.start_time}`
-            );
-            
+            const appointmentDateTime = new Date(`${schedule.scheduled_date}T${schedule.start_time}`);
             const now = new Date();
             const timeDiff = appointmentDateTime.getTime() - now.getTime();
             const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-            
-            let displayDate = '';
-            if (daysDiff === 0) displayDate = 'Today';
-            else if (daysDiff === 1) displayDate = 'Tomorrow';
+
+            let displayDate = "";
+            if (daysDiff === 0) displayDate = "Today";
+            else if (daysDiff === 1) displayDate = "Tomorrow";
             else if (daysDiff < 7) displayDate = `In ${daysDiff} days`;
             else displayDate = appointmentDateTime.toLocaleDateString();
 
-            // Format time (HH:MM AM/PM)
-            const formattedTime = appointmentDateTime.toLocaleTimeString([], { 
-              hour: '2-digit', 
-              minute: '2-digit',
-              hour12: true 
+            const formattedTime = appointmentDateTime.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+              hour12: true,
             });
 
             return {
@@ -222,562 +308,573 @@ export default function Dashboard() {
               date: displayDate,
               time: formattedTime,
               type: schedule.consultation_type,
-              avatar: doctor.profile_image || '',
+              avatar: doctor.profile_image || "",
               appointment_date: schedule.scheduled_date,
-              start_time: schedule.start_time,
-              end_time: schedule.end_time,
-              status: schedule.status
+              status: schedule.status,
             };
           })
         );
-
-        console.log('Processed appointments:', appointmentsWithDoctors);
         setUpcomingAppointments(appointmentsWithDoctors);
-      } catch (error) {
-        console.error('Error in fetchAppointments:', error);
-        // Set empty array on error to clear any previous state
+      } catch {
         setUpcomingAppointments([]);
       } finally {
         setIsLoadingAppointments(false);
       }
     };
 
-    if (isAuthenticated) {
-      fetchAppointments();
-    }
+    if (isAuthenticated) fetchAppointments();
   }, [userProfile?.id, isAuthenticated]);
 
-  // Handle redirect to sign-in if not authenticated and not loading
+  // Fetch chart data — consultations per day over the last 7 days
   useEffect(() => {
-    // Only redirect if we're not loading and we're sure the user is not authenticated
+    const fetchChartData = async () => {
+      if (!userProfile?.id) return;
+      try {
+        const days: { day: string; consultations: number }[] = [];
+        const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          const dateStr = d.toISOString().split("T")[0];
+          const { count } = await supabase
+            .from("schedules")
+            .select("*", { count: "exact", head: true })
+            .eq("patient_id", userProfile.id)
+            .eq("scheduled_date", dateStr)
+            .in("status", ["confirmed", "completed"]);
+          days.push({ day: dayNames[d.getDay()], consultations: count || 0 });
+        }
+        setChartData(days);
+      } catch {
+        setChartData([]);
+      }
+    };
+    if (isAuthenticated) fetchChartData();
+  }, [userProfile?.id, isAuthenticated]);
+
+  // Cancel appointment
+  const handleCancelAppointment = async (scheduleId: string) => {
+    try {
+      // Get the schedule to find the doctor
+      const { data: schedule } = await supabase
+        .from("schedules")
+        .select("*, doctor_profiles(user_id, full_name, first_name, last_name)")
+        .eq("id", scheduleId)
+        .single();
+
+      const { error } = await supabase
+        .from("schedules")
+        .update({ status: "cancelled" })
+        .eq("id", scheduleId);
+      if (error) throw error;
+
+      // Notify the doctor in-app
+      const doctorUserId = (schedule?.doctor_profiles as { user_id?: string } | null)?.user_id;
+      if (doctorUserId) {
+        await fetch("/api/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            notifications: [{
+              user_id: doctorUserId,
+              title: "Appointment Cancelled",
+              body: `${userProfile?.first_name || "A patient"} has cancelled their appointment on ${schedule?.scheduled_date} at ${schedule?.start_time}.`,
+              type: "warning",
+              schedule_id: scheduleId,
+            }],
+          }),
+        });
+      }
+
+      toast({ title: "Cancelled", description: "Your appointment has been cancelled." });
+      // Refresh appointments list
+      setUpcomingAppointments((prev) =>
+        prev.map((a) => a.id === scheduleId ? { ...a, status: "cancelled" } : a)
+      );
+    } catch {
+      toast({ title: "Error", description: "Failed to cancel appointment.", variant: "destructive" });
+    }
+  };
+
+  // Auth redirect
+  useEffect(() => {
     if (!loading) {
-      if (isAuthenticated) {
-        console.log("User is authenticated, showing dashboard");
-      } else {
-        console.log("User is not authenticated, will redirect to sign-in");
+      if (!isAuthenticated) {
         const timer = setTimeout(() => {
-          console.log("Executing redirect to sign-in");
           window.location.href = "/signin?redirectedFrom=dashboard";
         }, 1000);
-
         return () => clearTimeout(timer);
       }
     }
-  }, [loading, isAuthenticated, userProfile]);
+  }, [loading, isAuthenticated]);
 
+  const copyWalletAddress = async () => {
+    if (userProfile?.wallet_address) {
+      try {
+        await navigator.clipboard.writeText(userProfile.wallet_address);
+        toast({ title: "Copied!", description: "Wallet address copied to clipboard." });
+      } catch {
+        toast({ title: "Error", description: "Failed to copy wallet address.", variant: "destructive" });
+      }
+    }
+  };
+
+  const getTimeOfDayGreeting = () => {
+    const h = new Date().getHours();
+    if (h < 12) return "Morning";
+    if (h < 17) return "Afternoon";
+    return "Evening";
+  };
+
+  const stats = [
+    {
+      label: "Upcoming Appointments",
+      value: isLoadingAppointments ? "..." : upcomingAppointments.length.toString(),
+      change: "View all appointments",
+      icon: Calendar,
+      color: "bg-[#004DFF]",
+    },
+    {
+      label: "Wallet Balance",
+      value: isLoadingBalance ? "..." : `${walletBalance} USDC`,
+      change: "Click header to copy address",
+      icon: Wallet,
+      color: "bg-emerald-500",
+    },
+    {
+      label: "Consultations",
+      value: "12",
+      change: "Total consultations",
+      icon: Activity,
+      color: "bg-violet-500",
+    },
+    {
+      label: "Active Medications",
+      value: "3",
+      change: "Current prescriptions",
+      icon: Pill,
+      color: "bg-amber-500",
+    },
+  ];
+
+
+  // Loading state
   if (loading) {
-    console.log('Dashboard: Rendering loading state');
     return (
-      <div className="container mx-auto px-4 py-8">
-        <DashboardSkeleton />
-      </div>
-    );
-  }
-
-  if (error) {
-    console.error("Error loading user profile:", error);
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <h2 className="text-xl font-semibold text-red-800 mb-2">
-            {userProfile ? "Profile Error" : "Authentication Error"}
-          </h2>
-          <p className="text-red-600 mb-4">{error}</p>
-          <Button 
-            variant="outline" 
-            onClick={() => window.location.reload()}
-            className="mt-4"
-          >
-            Retry
-          </Button>
-          <p className="text-red-600 mb-4">
-            {userProfile
-              ? "There was an error loading your profile data."
-              : "You need to be signed in to access the dashboard."}
-          </p>
-          <div className="flex justify-center gap-4">
-            <Button onClick={() => window.location.reload()} variant="outline">
-              Try Again
-            </Button>
-            <Button
-              onClick={() => (window.location.href = "/signin")}
-              variant="destructive"
-            >
-              {userProfile ? "Update Profile" : "Sign In"}
-            </Button>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex">
+        <div className="hidden lg:block w-[280px] bg-white dark:bg-slate-800 border-r border-slate-100 dark:border-slate-700" />
+        <div className="flex-1 p-4 lg:p-8 max-w-7xl mx-auto w-full">
+          <div className="flex items-center justify-between mb-8">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-10 w-10 rounded-full" />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+            {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-32 rounded-2xl" />)}
+          </div>
+          <div className="grid lg:grid-cols-3 gap-6">
+            <Skeleton className="h-64 rounded-2xl lg:col-span-2" />
+            <Skeleton className="h-64 rounded-2xl" />
           </div>
         </div>
       </div>
     );
   }
 
-  const recentRecords = [
-    {
-      id: 1,
-      title: "Blood Test Results",
-      date: "2 days ago",
-      doctor: "Dr. Adaora Okafor",
-      type: "Lab Report",
-    },
-    {
-      id: 2,
-      title: "Consultation Notes",
-      date: "1 week ago",
-      doctor: "Dr. Emeka Nwosu",
-      type: "Consultation",
-    },
-  ];
-
-  const quickActions = [
-    {
-      icon: Calendar,
-      label: "Book Appointment",
-      href: "/doctors",
-      color: "bg-blue-500",
-    },
-    {
-      icon: MessageSquare,
-      label: "AI Health Chat",
-      href: "/ai-chat",
-      color: "bg-gradient-to-r from-purple-500 to-pink-500",
-    },
-    {
-      icon: FileText,
-      label: "View Records",
-      href: "/records",
-      color: "bg-purple-500",
-    },
-    {
-      icon: Pill,
-      label: "Order Medication",
-      href: "/medication",
-      color: "bg-green-500",
-    },
-  ];
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+        <div className="text-center p-8 max-w-md">
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Error Loading Dashboard</h2>
+          <p className="text-slate-500 dark:text-slate-400 mb-6">{error}</p>
+          <button
+            onClick={() => router.push("/signin")}
+            className="px-6 py-2 bg-[#004DFF] text-white rounded-xl font-bold hover:bg-blue-700 transition"
+          >
+            Sign In
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-800 border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Image
-              src="/telehealthlogo.svg"
-              alt="Epoch telehealth logo"
-              width={150}
-              height={40}
-              className="h-8 w-auto"
-            />
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-              {userProfile?.user_type
-                ? `${
-                    userProfile.user_type.charAt(0).toUpperCase() +
-                    userProfile.user_type.slice(1)
-                  } Dashboard`
-                : "Dashboard"}
-            </h1>
-          </div>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 font-sans text-slate-900 dark:text-white flex">
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {isSidebarOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSidebarOpen(false)}
+            className="fixed inset-0 bg-slate-900/20 dark:bg-black/40 backdrop-blur-sm z-40 lg:hidden"
+          />
+        )}
+      </AnimatePresence>
 
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" className="relative">
-              <Bell className="w-5 h-5" />
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500"></span>
-            </Button>
-            <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg px-3 py-1.5">
-              <Wallet className="w-5 h-5 mr-2 text-gray-600 dark:text-gray-300" />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
-                {isLoadingBalance ? (
-                  <span className="inline-block h-4 w-12 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></span>
-                ) : (
-                  `$${walletBalance} USDC`
-                )}
-              </span>
+      {/* Sidebar */}
+      <motion.aside
+        initial={false}
+        animate={{ width: isSidebarOpen ? 280 : 0, x: isSidebarOpen ? 0 : -280 }}
+        className="fixed lg:relative z-50 h-screen bg-white dark:bg-slate-800 border-r border-slate-100 dark:border-slate-700 overflow-hidden flex flex-col flex-shrink-0"
+        style={{ minWidth: isSidebarOpen ? 280 : 0 }}
+      >
+        {/* Logo */}
+        <div className="p-6 flex items-center gap-2">
+          <Image
+            src="/telehealthlogo.svg"
+            alt="Epoch Telehealth"
+            width={140}
+            height={36}
+            className="h-8 w-auto"
+          />
+          <span className="text-xl text-[#004DFF] font-bold tracking-tight">EpochTelehealth</span>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-400 dark:text-slate-500"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 px-4 space-y-2 mt-2 overflow-y-auto">
+          <SidebarItem
+            icon={LayoutDashboard}
+            label="Dashboard"
+            active={activeTab === "Dashboard"}
+            onClick={() => setActiveTab("Dashboard")}
+          />
+          <SidebarItem
+            icon={Stethoscope}
+            label="Doctors"
+            active={activeTab === "Doctors"}
+            href="/doctors"
+          />
+          <SidebarItem
+            icon={MessageSquare}
+            label="AI Health Chat"
+            active={activeTab === "AI Chat"}
+            href="/ai-chat"
+          />
+          <SidebarItem
+            icon={Pill}
+            label="Order Medication"
+            active={activeTab === "Medication"}
+            href="/medication"
+          />
+          <SidebarItem
+            icon={FileText}
+            label="Medical Records"
+            active={activeTab === "Records"}
+            href="/records"
+          />
+          <SidebarItem
+            icon={Settings}
+            label="Settings"
+            active={activeTab === "Settings"}
+            onClick={() => setActiveTab("Settings")}
+          />
+        </nav>
+
+        {/* Patient Profile Area */}
+        <div className="p-4 mt-auto">
+          <div className="bg-slate-50 dark:bg-slate-900 rounded-2xl p-4 mb-2">
+            <div className="flex items-center space-x-3 mb-4">
+              <Avatar className="h-10 w-10 border-2 border-white shadow-sm">
+                <AvatarImage src={avatarSrc} />
+                <AvatarFallback className="text-xs font-bold bg-[#004DFF]/10 dark:bg-blue-500/20 text-[#004DFF] dark:text-blue-400">
+                  {userProfile?.first_name ? getInitials(userProfile.first_name) : "U"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="min-w-0">
+                <p className="text-sm font-bold truncate">
+                  {formatName(userProfile?.first_name || "")} {formatName(userProfile?.last_name || "")}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  Patient
+                </p>
+              </div>
             </div>
-
-            {/* User Avatar Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  className="relative h-8 w-8 rounded-full p-0"
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage
-                      src={avatarSrc}
-                      alt={userProfile?.first_name || "User"}
-                    />
-                    <AvatarFallback>
-                      {userProfile?.first_name
-                        ? getInitials(userProfile.first_name)
-                        : "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end">
-                <div className="flex items-center justify-start gap-2 p-2">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage
-                      src={avatarSrc}
-                      alt={userProfile?.first_name || "User"}
-                    />
-                    <AvatarFallback>
-                      {userProfile?.first_name
-                        ? getInitials(formatName(userProfile.first_name))
-                        : "U"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">
-                      {userProfile?.first_name
-                        ? formatName(userProfile.first_name)
-                        : ""}{" "}
-                      {userProfile?.last_name
-                        ? formatName(userProfile.last_name)
-                        : ""}
-                    </p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      {userProfile?.email}
-                    </p>
-                  </div>
-                </div>
-                {/* Wallet Address */}
-                <DropdownMenuSeparator />
-                <div className="px-2 py-1.5">
-                  <p className="text-xs text-muted-foreground mb-1">
-                    Wallet Address
-                  </p>
-                  <DropdownMenuItem
-                    className="flex items-center justify-between cursor-pointer"
-                    onClick={async (e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-
-                      if (userProfile?.wallet_address) {
-                        try {
-                          await navigator.clipboard.writeText(
-                            userProfile.wallet_address
-                          );
-                          toast({
-                            title: "Wallet address copied!",
-                            description:
-                              "Your wallet address has been copied to clipboard.",
-                            duration: 3000,
-                          });
-                        } catch (err) {
-                          console.error("Failed to copy wallet address:", err);
-                          toast({
-                            title: "Error",
-                            description:
-                              "Failed to copy wallet address. Please try again.",
-                            variant: "destructive",
-                          });
-                        }
-                      }
-                    }}
-                  >
-                    <span className="text-sm font-mono truncate max-w-[180px]">
-                      {userProfile?.wallet_address
-                        ? `${userProfile.wallet_address.substring(
-                            0,
-                            6
-                          )}...${userProfile.wallet_address.substring(
-                            userProfile.wallet_address.length - 4
-                          )}`
-                        : "Not connected"}
-                    </span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="12"
-                      height="12"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      className="ml-2 text-muted-foreground"
-                    >
-                      <rect
-                        x="9"
-                        y="9"
-                        width="13"
-                        height="13"
-                        rx="2"
-                        ry="2"
-                      ></rect>
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                  </DropdownMenuItem>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20 w-full"
-                  onClick={async () => {
+            <div className="flex items-center justify-between mt-2 mb-1">
+              <ThemeToggle />
+              <button
+                onClick={async () => {
+                  try {
                     await supabase.auth.signOut();
                     window.location.href = "/signin";
-                  }}
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  } catch {}
+                }}
+                className="flex items-center gap-2 px-3 py-2 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors text-sm font-medium rounded-xl hover:bg-rose-50 dark:hover:bg-rose-500/10"
+              >
+                <LogOut size={15} />
+                <span>Sign Out</span>
+              </button>
+            </div>
           </div>
         </div>
-      </header>
+      </motion.aside>
 
-      <div className="container mx-auto px-4 py-6">
-        {/* Welcome Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mb-8"
-        >
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Welcome back,{" "}
-            {userProfile?.first_name
-              ? formatName(userProfile?.first_name)
-              : "User"}{" "}
-            👋
-          </h2>
-          <p className="text-gray-600 dark:text-gray-300">
-            Here&apos;s what&apos;s happening with your health today.
-          </p>
-        </motion.div>
+      {/* Main Content */}
+      <main className="flex-1 h-screen overflow-y-auto relative min-w-0">
+        {/* Header */}
+        <header className="sticky top-0 z-30 bg-white dark:bg-slate-800/80 backdrop-blur-md border-b border-slate-100 dark:border-slate-700 px-4 lg:px-8 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setSidebarOpen(!isSidebarOpen)}
+              className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-500 dark:text-slate-400"
+            >
+              <Menu size={20} />
+            </button>
+            <div className="relative hidden sm:block">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500"
+                size={17}
+              />
+              <input
+                type="text"
+                placeholder="Search doctors, appointments..."
+                className="pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-700 border-transparent focus:bg-white dark:focus:bg-slate-800 focus:border-[#004DFF] focus:ring-4 focus:ring-blue-500/10 rounded-xl text-sm w-56 transition-all outline-none"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="flex items-center space-x-2 lg:space-x-3">
+            {/* Wallet chip */}
+            <button
+              onClick={copyWalletAddress}
+              className="hidden sm:flex items-center space-x-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 px-3 py-2 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-200 transition"
+            >
+              <Wallet size={16} className="text-[#004DFF] dark:text-blue-400" />
+              <span>{isLoadingBalance ? "..." : `${walletBalance} USDC`}</span>
+            </button>
+            {/* Notifications */}
+            <NotificationDropdown userId={userProfile?.user_profile_id || userProfile?.id || ""} />
+            {/* Book appointment CTA */}
+            <Button
+              className="flex items-center space-x-2 bg-[#004DFF] text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-blue-200 dark:shadow-none hover:bg-blue-700 transition"
+              asChild
+            >
+              <Link href="/doctors">
+                <Plus size={17} />
+                <span className="hidden sm:inline">Book Appointment</span>
+              </Link>
+            </Button>
+          </div>
+        </header>
 
-        {/* Quick Actions */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
-        >
-          {quickActions.map((action, index) => (
-            <Link key={index} href={action.href}>
+        {/* Dashboard Body */}
+        <div className="p-4 lg:p-8 max-w-7xl mx-auto">
+          {/* Welcome */}
+          <div className="mb-8">
+            <h1 className="text-2xl lg:text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+              Good {getTimeOfDayGreeting()},{" "}
+              {userProfile?.first_name ? formatName(userProfile.first_name) : "User"}! 👋
+            </h1>
+            <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">
+              {isLoadingAppointments
+                ? "Loading your appointments..."
+                : `You have ${upcomingAppointments.length} upcoming appointment${
+                    upcomingAppointments.length !== 1 ? "s" : ""
+                  } scheduled.`}
+            </p>
+          </div>
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+            {stats.map((stat, idx) => (
               <motion.div
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                key={idx}
+                whileHover={{ y: -4 }}
+                transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm"
               >
-                <Card className="cursor-pointer hover:shadow-md transition-shadow">
-                  <CardContent className="p-4 text-center">
-                    <div
-                      className={`w-12 h-12 ${action.color} rounded-lg flex items-center justify-center mx-auto mb-3`}
-                    >
-                      <action.icon className="w-6 h-6 text-white" />
-                    </div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {action.label}
-                    </p>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </Link>
-          ))}
-        </motion.div>
-
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Upcoming Appointments */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="lg:col-span-2"
-          >
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="flex items-center">
-                  <Calendar className="w-5 h-5 mr-2 text-blue-600" />
-                  Upcoming Appointments
-                </CardTitle>
-                <Button variant="ghost" size="sm">
-                  <Plus className="w-4 h-4 mr-1" />
-                  <Link href="/doctors">Book New</Link>
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {isLoadingAppointments ? (
-                  <div className="space-y-4">
-                    {[1, 2].map((i) => (
-                      <div
-                        key={i}
-                        className="flex items-center space-x-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                      >
-                        <Skeleton className="h-12 w-12 rounded-full" />
-                        <div className="space-y-2 flex-1">
-                          <Skeleton className="h-4 w-3/4" />
-                          <Skeleton className="h-3 w-1/2" />
-                          <Skeleton className="h-3 w-2/3" />
-                        </div>
-                      </div>
-                    ))}
+                <div className="flex justify-between items-start mb-4">
+                  <div className={`p-3 rounded-xl ${stat.color} text-white shadow-lg opacity-90`}>
+                    <stat.icon size={22} />
                   </div>
-                ) : upcomingAppointments.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Calendar className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-                    <p className="text-gray-500 dark:text-gray-400">
-                      No upcoming appointments
-                    </p>
-                    <Button variant="outline" className="mt-4" asChild>
-                      <Link href="/doctors">Book an appointment</Link>
-                    </Button>
+                  <div className="flex items-center space-x-1 text-xs font-semibold text-emerald-600">
+                    <Activity size={11} />
+                    <span>↑</span>
                   </div>
+                </div>
+                <h3 className="text-slate-500 dark:text-slate-400 text-xs font-medium mb-1">{stat.label}</h3>
+                {loading ? (
+                  <Skeleton className="h-7 w-24 mb-1" />
                 ) : (
-                  upcomingAppointments.map((appointment) => (
-                    <motion.div
-                      key={appointment.id}
-                      whileHover={{ scale: 1.01 }}
-                      className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
-                    >
-                      <div className="flex items-center space-x-4">
-                        <Avatar>
-                          <AvatarImage
-                            src={appointment.avatar || "/placeholder.svg"}
-                          />
-                          <AvatarFallback>
-                            {appointment.doctor
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <h4 className="font-medium text-gray-900 dark:text-white">
-                            {appointment.doctor}
-                          </h4>
-                          <p className="text-sm text-gray-600 dark:text-gray-300">
-                            {appointment.specialty}
-                          </p>
-                          <div className="flex items-center space-x-2 mt-1">
-                            <Clock className="w-4 h-4 text-gray-400" />
-                            <span className="text-sm text-gray-600 dark:text-gray-300">
-                              {appointment.date} at {appointment.time}
-                            </span>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{stat.value}</p>
+                )}
+                <p className="text-slate-400 dark:text-slate-500 text-xs mt-1">{stat.change}</p>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Main Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left: Appointments + Chart */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Appointments */}
+              <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                  <h2 className="text-base font-bold flex items-center gap-2">
+                    <Calendar className="text-[#004DFF]" size={18} />
+                    Upcoming Appointments
+                  </h2>
+                  <Link
+                    href="/dashboard/appointments"
+                    className="text-[#004DFF] text-sm font-bold hover:underline"
+                  >
+                    View All
+                  </Link>
+                </div>
+                <div className="p-2">
+                  {isLoadingAppointments ? (
+                    <div className="space-y-3 p-4">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <Skeleton className="h-11 w-11 rounded-full" />
+                          <div className="flex-1 space-y-2">
+                            <Skeleton className="h-4 w-40" />
+                            <Skeleton className="h-3 w-56" />
                           </div>
                         </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="secondary">
-                          {appointment.type
-                            .split("_")
-                            .map(
-                              (word) =>
-                                word.charAt(0).toUpperCase() + word.slice(1)
-                            )
-                            .join(" ")}
-                        </Badge>
-                        <Button
-                          size="sm"
-                          variant={
-                            appointment.type === "video"
-                              ? "default"
-                              : appointment.type === "extended_video"
-                              ? "default"
-                              : "outline"
-                          }
-                          onClick={() => {
-                            if (appointment.type === "text") {
-                              router.push(
-                                `/chat/patient?appointmentId=${appointment.id}`
-                              );
-                            } else {
-                              router.push(
-                                `/video-call?appointmentId=${appointment.id}&role=patient`
-                              );
-                            }
-                          }}
-                        >
-                          {appointment.type === "video" ? (
-                            <Video className="w-4 h-4 mr-1" />
-                          ) : appointment.type === "extended_video" ? (
-                            <Video className="w-4 h-4 mr-1" />
-                          ) : (
-                            <MessageCircle className="w-4 h-4 mr-1" />
-                          )}
-                          Join{" "}
-                          {appointment.type === "video"
-                            ? "Video"
-                            : appointment.type === "extended_video"
-                            ? "Video"
-                            : "Chat"}
-                        </Button>
-                      </div>
-                    </motion.div>
-                  ))
-                )}
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Health Summary */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="space-y-6"
-          >
-            {/* Recent Records */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <FileText className="w-5 h-5 mr-2 text-purple-600" />
-                  Recent Records
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {recentRecords.map((record) => (
-                  <div
-                    key={record.id}
-                    className="flex items-center justify-between"
-                  >
-                    <div>
-                      <p className="font-medium text-gray-900 dark:text-white text-sm">
-                        {record.title}
-                      </p>
-                      <p className="text-xs text-gray-600 dark:text-gray-300">
-                        {record.date} • {record.doctor}
-                      </p>
+                      ))}
                     </div>
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
-                  </div>
-                ))}
-                <Link href="/records">
-                  <Button variant="ghost" size="sm" className="w-full mt-2">
-                    View All Records
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
+                  ) : upcomingAppointments.length > 0 ? (
+                    upcomingAppointments.map((apt) => (
+                      <AppointmentRow
+                        key={apt.id}
+                        appointment={apt}
+                        router={router}
+                        onCancel={handleCancelAppointment}
+                      />
+                    ))
+                  ) : (
+                    <div className="text-center py-12">
+                      <Calendar className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">No appointments scheduled yet.</p>
+                      <Link href="/doctors" className="mt-4 text-[#004DFF] text-sm font-bold hover:underline inline-block">
+                        + Book your first appointment
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </section>
 
-            {/* Health Stats */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Health Overview</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600 dark:text-gray-300">
-                    Last Checkup
-                  </span>
-                  <span className="text-sm font-medium">2 weeks ago</span>
+              {/* Health Activity Chart */}
+              <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-base font-bold flex items-center gap-2">
+                    <Activity className="text-emerald-600" size={18} />
+                    Consultation Activity
+                  </h2>
+                  <span className="text-xs font-bold text-slate-400 dark:text-slate-500">Last 7 Days</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600 dark:text-gray-300">
-                    Medications
-                  </span>
-                  <span className="text-sm font-medium">3 active</span>
+                {chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={chartData} barCategoryGap="20%">
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis
+                        dataKey="day"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 11, fontWeight: 700, fill: "#94a3b8" }}
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 11, fontWeight: 600, fill: "#94a3b8" }}
+                        allowDecimals={false}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#1e293b",
+                          border: "none",
+                          borderRadius: "12px",
+                          color: "#fff",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                        }}
+                        cursor={{ fill: "rgba(16,185,129,0.06)" }}
+                      />
+                      <Bar dataKey="consultations" fill="#10b981" radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[200px] flex items-center justify-center text-slate-400 dark:text-slate-500 text-sm">
+                    No consultation data for this period
+                  </div>
+                )}
+              </section>
+            </div>
+
+            {/* Right Sidebar Widgets */}
+            <div className="space-y-6">
+              {/* Quick Actions Widget */}
+              <section className="bg-[#004DFF] rounded-2xl p-6 text-white shadow-xl shadow-blue-200 dark:shadow-none">
+                <h2 className="text-base font-bold mb-4">Quick Actions</h2>
+                <div className="flex items-center space-x-3 mb-6">
+                  <div className="w-3 h-3 bg-emerald-400 rounded-full animate-pulse" />
+                  <span className="font-medium text-sm">Your health, your control</span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600 dark:text-gray-300">
-                    Consultations
-                  </span>
-                  <span className="text-sm font-medium">12 total</span>
+                <div className="space-y-3">
+                  <Link
+                    href="/doctors"
+                    className="w-full bg-white/20 hover:bg-white/30 backdrop-blur-md py-3 rounded-xl font-bold transition-all flex items-center justify-center space-x-2 text-sm text-white"
+                  >
+                    <Stethoscope size={16} />
+                    <span>Find a Doctor</span>
+                  </Link>
+                  <Link
+                    href="/ai-chat"
+                    className="w-full bg-white text-[#004DFF] py-3 rounded-xl font-bold transition-all text-sm hover:bg-blue-50 flex items-center justify-center space-x-2"
+                  >
+                    <Heart size={16} />
+                    <span>AI Health Chat</span>
+                  </Link>
                 </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+              </section>
+
+              {/* Wallet Widget */}
+              <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-5">
+                <h2 className="text-base font-bold mb-4 flex items-center gap-2">
+                  <Wallet size={18} className="text-[#004DFF]" />
+                  USDC Wallet
+                </h2>
+                <p className="text-2xl font-bold text-slate-900 dark:text-white mb-1">
+                  {isLoadingBalance ? <Skeleton className="h-8 w-28 inline-block" /> : `${walletBalance} USDC`}
+                </p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mb-4 truncate">
+                  {userProfile?.wallet_address
+                    ? `${userProfile.wallet_address.substring(0, 8)}...${userProfile.wallet_address.slice(-6)}`
+                    : "Not connected"}
+                </p>
+                <button
+                  onClick={copyWalletAddress}
+                  className="w-full py-2.5 bg-slate-900 dark:bg-[#004DFF] text-white rounded-xl font-bold text-sm hover:opacity-90 transition"
+                >
+                  Copy Wallet Address
+                </button>
+              </section>
+
+              {/* HIPAA Badge */}
+              <section className="bg-slate-900 rounded-2xl p-5 text-white">
+                <div className="flex items-center space-x-3 mb-3">
+                  <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-lg">
+                    <Shield size={18} />
+                  </div>
+                  <h3 className="font-bold text-sm">HIPAA Compliant</h3>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Your connection is end-to-end encrypted with 256-bit AES. All patient data is stored securely in accordance with global healthcare regulations.
+                </p>
+              </section>
+            </div>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { AppointmentEmail } from "@/components/emails/AppointmentEmail";
+import { RescheduleEmail } from "@/components/emails/RescheduleEmail";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -86,5 +87,38 @@ export async function sendAppointmentConfirmation(
       error:
         error instanceof Error ? error : new Error("Unknown error occurred"),
     };
+  }
+}
+export interface RescheduleDetails {
+  patientName: string;
+  doctorName: string;
+  originalDate: string;
+  originalTime: string;
+  doctorMessage?: string;
+  recipientType: "patient" | "doctor";
+}
+
+export async function sendRescheduleNotification(to: string, details: RescheduleDetails) {
+  try {
+    const emailComponent = RescheduleEmail({ appointment: details });
+    const subject = details.recipientType === "patient"
+      ? `Reschedule Request from Dr. ${details.doctorName}`
+      : `Appointment Cancelled by ${details.patientName}`;
+
+    const { data, error } = await resend.emails.send({
+      from: "Sabb | Epoch telehealth <noreply@epochtelehealth.com>",
+      to,
+      subject,
+      react: emailComponent,
+    });
+
+    if (error) {
+      console.error("Error sending reschedule email:", error);
+      return { success: false, error };
+    }
+    return { success: true, data };
+  } catch (error) {
+    console.error("Failed to send reschedule email:", error);
+    return { success: false, error: error instanceof Error ? error : new Error("Unknown error") };
   }
 }

@@ -7,16 +7,14 @@ import {
   Bot,
   User,
   Loader2,
-  Heart,
   Brain,
   Stethoscope,
   ArrowLeft,
   Sparkles,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import Link from "next/link";
 
@@ -136,59 +134,63 @@ export default function AIChatPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50 dark:from-gray-900 dark:via-gray-800 dark:to-purple-900">
+    <div className="min-h-screen bg-slate-950 relative overflow-hidden">
+      {/* Background Effects */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-[#004DFF]/8 rounded-full blur-[120px]" />
+        <div className="absolute bottom-0 right-1/4 w-[400px] h-[400px] bg-blue-600/5 rounded-full blur-[100px]" />
+      </div>
+
       {/* Header */}
-      <header className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-b sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-4">
+      <header className="sticky top-0 z-20 bg-slate-900/80 backdrop-blur-xl border-b border-slate-800/50">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-4">
             <Link href="/dashboard">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white hover:bg-slate-800">
                 <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
               </Button>
             </Link>
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-[#004DFF] rounded-2xl flex items-center justify-center">
                 <Brain className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                <h1 className="text-lg font-bold text-white">
                   AI Health Assistant
                 </h1>
-                <p className="text-sm text-gray-600 dark:text-gray-300">
+                <p className="text-xs text-slate-400">
                   Powered by your health data
                 </p>
               </div>
             </div>
           </div>
-          <Badge
-            variant="secondary"
-            className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-          >
-            <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
-            Online
-          </Badge>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+            <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
+            <span className="text-xs font-medium text-emerald-400">Online</span>
+          </div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
+      <div className="container mx-auto px-4 py-6 max-w-4xl relative z-10">
         {/* Chat Container */}
-        <Card className="h-[calc(100vh-200px)] flex flex-col shadow-xl border-0 bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm">
-          {/* Chat Header */}
-          <CardHeader className="border-b bg-gradient-to-r from-purple-500/10 to-pink-500/10">
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Sparkles className="w-5 h-5 text-purple-600" />
-                <span>AI Diagnostic Chat</span>
+        <div className="h-[calc(100vh-160px)] flex flex-col bg-slate-900/60 backdrop-blur-xl rounded-3xl border border-slate-800/50 shadow-2xl overflow-hidden">
+          {/* Chat Sub-header */}
+          <div className="px-6 py-4 border-b border-slate-800/50 bg-slate-900/40">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[#004DFF]" />
+                <span className="text-sm font-semibold text-white">AI Diagnostic Chat</span>
               </div>
-              <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-300">
-                <Stethoscope className="w-4 h-4" />
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <Stethoscope className="w-3.5 h-3.5" />
                 <span>Trained on your health records</span>
               </div>
-            </CardTitle>
-          </CardHeader>
+            </div>
+          </div>
 
           {/* Messages */}
-          <CardContent className="flex-1 overflow-y-auto p-6 space-y-4">
+          <div className="flex-1 overflow-y-auto p-6 space-y-5 custom-scrollbar">
             <AnimatePresence>
               {messages.map((message) => (
                 <motion.div
@@ -201,20 +203,20 @@ export default function AIChatPage() {
                   }`}
                 >
                   <div
-                    className={`flex items-start space-x-3 max-w-[80%] ${
+                    className={`flex items-start gap-3 max-w-[80%] ${
                       message.type === "user"
-                        ? "flex-row-reverse space-x-reverse"
+                        ? "flex-row-reverse"
                         : ""
                     }`}
                   >
                     <Avatar
-                      className={`w-8 h-8 ${
+                      className={`w-8 h-8 shrink-0 ${
                         message.type === "ai"
-                          ? "bg-gradient-to-r from-purple-500 to-pink-500"
-                          : "bg-blue-500"
+                          ? "bg-[#004DFF]"
+                          : "bg-slate-700"
                       }`}
                     >
-                      <AvatarFallback className="text-white">
+                      <AvatarFallback className="text-white bg-transparent">
                         {message.type === "ai" ? (
                           <Bot className="w-4 h-4" />
                         ) : (
@@ -226,18 +228,18 @@ export default function AIChatPage() {
                     <div
                       className={`rounded-2xl px-4 py-3 ${
                         message.type === "user"
-                          ? "bg-blue-500 text-white"
-                          : "bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white"
+                          ? "bubble-sent text-slate-100"
+                          : "bubble-received text-slate-200"
                       }`}
                     >
                       <p className="whitespace-pre-wrap text-sm leading-relaxed">
                         {message.content}
                       </p>
                       <p
-                        className={`text-xs mt-2 ${
+                        className={`text-[10px] mt-2 ${
                           message.type === "user"
-                            ? "text-blue-100"
-                            : "text-gray-500 dark:text-gray-400"
+                            ? "text-slate-400"
+                            : "text-slate-500"
                         }`}
                       >
                         {message.timestamp.toLocaleTimeString([], {
@@ -258,16 +260,16 @@ export default function AIChatPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="flex justify-start"
               >
-                <div className="flex items-start space-x-3">
-                  <Avatar className="w-8 h-8 bg-gradient-to-r from-purple-500 to-pink-500">
-                    <AvatarFallback className="text-white">
+                <div className="flex items-start gap-3">
+                  <Avatar className="w-8 h-8 bg-[#004DFF]">
+                    <AvatarFallback className="text-white bg-transparent">
                       <Bot className="w-4 h-4" />
                     </AvatarFallback>
                   </Avatar>
-                  <div className="bg-gray-100 dark:bg-gray-700 rounded-2xl px-4 py-3">
-                    <div className="flex items-center space-x-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-purple-600" />
-                      <span className="text-sm text-gray-600 dark:text-gray-300">
+                  <div className="bg-slate-800/80 border border-slate-700/50 rounded-2xl px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-[#004DFF]" />
+                      <span className="text-sm text-slate-400">
                         AI is analyzing...
                       </span>
                     </div>
@@ -287,32 +289,30 @@ export default function AIChatPage() {
                 >
                   {messages[messages.length - 1].suggestions?.map(
                     (suggestion, index) => (
-                      <Button
+                      <button
                         key={index}
-                        variant="outline"
-                        size="sm"
                         onClick={() => handleSuggestionClick(suggestion)}
-                        className="text-xs bg-white/50 hover:bg-purple-50 border-purple-200 text-purple-700 hover:text-purple-800"
+                        className="text-xs px-3 py-1.5 rounded-xl bg-white/5 border border-slate-700/50 text-slate-300 hover:bg-[#004DFF]/10 hover:border-[#004DFF]/30 hover:text-white transition-all duration-200"
                       >
                         {suggestion}
-                      </Button>
+                      </button>
                     )
                   )}
                 </motion.div>
               )}
 
             <div ref={messagesEndRef} />
-          </CardContent>
+          </div>
 
           {/* Input */}
-          <div className="border-t p-4 bg-gray-50/50 dark:bg-gray-800/50">
-            <div className="flex items-center space-x-2">
+          <div className="border-t border-slate-800/50 p-4 bg-slate-900/60">
+            <div className="flex items-center gap-2">
               <div className="flex-1 relative">
                 <Input
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   placeholder="Describe your symptoms or ask about your health..."
-                  className="pr-12 bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600"
+                  className="pr-12 bg-slate-800/80 border-slate-700/50 text-white placeholder:text-slate-500 rounded-xl h-11 focus:ring-2 focus:ring-[#004DFF]/30 focus:border-[#004DFF]/50 transition-all"
                   onKeyPress={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
@@ -325,22 +325,22 @@ export default function AIChatPage() {
                   size="sm"
                   onClick={() => handleSendMessage(inputMessage)}
                   disabled={!inputMessage.trim() || isLoading}
-                  className="absolute right-1 top-1 h-8 w-8 p-0 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 w-8 p-0 bg-[#004DFF] hover:bg-blue-600 rounded-lg disabled:opacity-30"
                 >
-                  <Send className="w-4 h-4" />
+                  <Send className="w-3.5 h-3.5" />
                 </Button>
               </div>
             </div>
 
-            <div className="flex items-center justify-center mt-3 text-xs text-gray-500 dark:text-gray-400">
-              <Heart className="w-3 h-3 mr-1 text-red-500" />
+            <div className="flex items-center justify-center mt-3 text-[10px] text-slate-500">
+              <Shield className="w-3 h-3 mr-1.5 text-slate-600" />
               <span>
                 AI responses are for informational purposes. Always consult
                 healthcare professionals for medical advice.
               </span>
             </div>
           </div>
-        </Card>
+        </div>
       </div>
     </div>
   );

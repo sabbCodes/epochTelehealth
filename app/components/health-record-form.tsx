@@ -12,13 +12,6 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 
 import {
@@ -171,7 +164,6 @@ export function HealthRecordForm({
     medications: "",
     notes: "",
     followUp: "",
-    recordType: "consultation",
   });
 
   const [isSaving, setIsSaving] = useState(false);
@@ -455,60 +447,32 @@ export function HealthRecordForm({
     }
   };
 
-  const recordTypes = [
-    { value: "consultation", label: "Consultation" },
-    { value: "diagnosis", label: "Diagnosis" },
-    { value: "prescription", label: "Prescription" },
-    { value: "lab_result", label: "Lab Result" },
-    { value: "imaging", label: "Imaging" },
-    { value: "follow_up", label: "Follow-up" },
-  ];
+
 
   return (
-    <Card className="w-full z-40">
-      <CardHeader className="bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20">
+    <Card className="w-full z-40 bg-slate-900/60 backdrop-blur-xl border-slate-800/50 rounded-2xl shadow-xl overflow-hidden">
+      <CardHeader className="bg-slate-900/80 border-b border-slate-800/50">
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle className="text-xl">New Health Record</CardTitle>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-              Patient: {patientName}
+            <CardTitle className="text-xl text-white">New Health Record (Consultation)</CardTitle>
+            <p className="text-sm text-slate-400 mt-1">
+              Patient: <span className="text-slate-200 font-medium">{patientName}</span>
             </p>
           </div>
           <Badge
             variant="outline"
-            className="border-blue-500 text-blue-600 dark:text-blue-400"
+            className="border-[#004DFF]/30 text-[#004DFF] bg-[#004DFF]/10 px-3 py-1.5 rounded-xl"
           >
-            <Clock className="w-3 h-3 mr-1" />
+            <Clock className="w-3.5 h-3.5 mr-1.5" />
             {new Date().toLocaleDateString()}
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="p-6 space-y-6">
-        <div className="grid md:grid-cols-2 gap-6">
-          <div>
-            <Label htmlFor="recordType">Record Type</Label>
-            <Select
-              value={formData.recordType}
-              onValueChange={(value) => handleChange("recordType", value)}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select record type" />
-              </SelectTrigger>
-              <SelectContent>
-                {recordTypes.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>
-                    {type.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
         <div>
-          <Label htmlFor="diagnosis">
+          <Label htmlFor="diagnosis" className="text-slate-300">
             Diagnosis{" "}
-            <span className="text-xs text-gray-500">(up to 24 characters)</span>
+            <span className="text-xs text-slate-500 font-normal">(up to 24 characters)</span>
           </Label>
           <Textarea
             id="diagnosis"
@@ -516,112 +480,113 @@ export function HealthRecordForm({
             onChange={(e) => handleChange("diagnosis", e.target.value)}
             placeholder="Enter diagnosis"
             maxLength={24}
+            className="mt-1.5 bg-slate-800/80 border-slate-700 focus:border-[#004DFF] focus:ring-1 focus:ring-[#004DFF] text-white placeholder:text-slate-500 rounded-xl"
           />
-          <p className="text-xs text-gray-500 mt-1">
-            {formData.diagnosis.length}/24 characters
+          <p className="text-xs text-slate-500 mt-1 flex justify-end">
+            {formData.diagnosis.length}/24
           </p>
         </div>
 
         <div>
-          <Label htmlFor="symptoms">
+          <Label htmlFor="symptoms" className="text-slate-300">
             Symptoms{" "}
-            <span className="text-xs text-gray-500">(up to 40 characters)</span>
+            <span className="text-xs text-slate-500 font-normal">(up to 40 characters)</span>
           </Label>
           <Textarea
             id="symptoms"
             value={formData.symptoms}
             onChange={(e) => handleChange("symptoms", e.target.value)}
             placeholder="Describe patient symptoms"
-            className="min-h-[80px]"
+            className="mt-1.5 min-h-[80px] bg-slate-800/80 border-slate-700 focus:border-[#004DFF] focus:ring-1 focus:ring-[#004DFF] text-white placeholder:text-slate-500 rounded-xl"
             maxLength={40}
           />
-          <p className="text-xs text-gray-500 mt-1">
-            {formData.symptoms.length}/40 characters
+          <p className="text-xs text-slate-500 mt-1 flex justify-end">
+            {formData.symptoms.length}/40
           </p>
         </div>
 
         <div>
-          <Label htmlFor="treatment">
+          <Label htmlFor="treatment" className="text-slate-300">
             Treatment Plan{" "}
-            <span className="text-xs text-gray-500">(up to 16 characters)</span>
+            <span className="text-xs text-slate-500 font-normal">(up to 16 characters)</span>
           </Label>
           <Textarea
             id="treatment"
             value={formData.treatment}
             onChange={(e) => handleChange("treatment", e.target.value)}
             placeholder="Describe the treatment plan"
-            className="min-h-[80px]"
+            className="mt-1.5 min-h-[80px] bg-slate-800/80 border-slate-700 focus:border-[#004DFF] focus:ring-1 focus:ring-[#004DFF] text-white placeholder:text-slate-500 rounded-xl"
             maxLength={16}
           />
-          <p className="text-xs text-gray-500 mt-1">
-            {formData.treatment.length}/16 characters
+          <p className="text-xs text-slate-500 mt-1 flex justify-end">
+            {formData.treatment.length}/16
           </p>
         </div>
 
         <div>
-          <Label htmlFor="medications">
+          <Label htmlFor="medications" className="text-slate-300">
             Medications{" "}
-            <span className="text-xs text-gray-500">(up to 40 characters)</span>
+            <span className="text-xs text-slate-500 font-normal">(up to 40 characters)</span>
           </Label>
           <Textarea
             id="medications"
             value={formData.medications}
             onChange={(e) => handleChange("medications", e.target.value)}
             placeholder="List prescribed medications with dosage"
-            className="min-h-[80px]"
+            className="mt-1.5 min-h-[80px] bg-slate-800/80 border-slate-700 focus:border-[#004DFF] focus:ring-1 focus:ring-[#004DFF] text-white placeholder:text-slate-500 rounded-xl"
             maxLength={40}
           />
-          <p className="text-xs text-gray-500 mt-1">
-            {formData.medications.length}/40 characters
+          <p className="text-xs text-slate-500 mt-1 flex justify-end">
+            {formData.medications.length}/40
           </p>
         </div>
 
         <div>
-          <Label htmlFor="notes">
+          <Label htmlFor="notes" className="text-slate-300">
             Additional Notes{" "}
-            <span className="text-xs text-gray-500">(up to 16 characters)</span>
+            <span className="text-xs text-slate-500 font-normal">(up to 16 characters)</span>
           </Label>
           <Textarea
             id="notes"
             value={formData.notes}
             onChange={(e) => handleChange("notes", e.target.value)}
             placeholder="Any additional notes or observations"
-            className="min-h-[80px]"
+            className="mt-1.5 min-h-[80px] bg-slate-800/80 border-slate-700 focus:border-[#004DFF] focus:ring-1 focus:ring-[#004DFF] text-white placeholder:text-slate-500 rounded-xl"
             maxLength={16}
           />
-          <p className="text-xs text-gray-500 mt-1">
-            {formData.notes.length}/16 characters
+          <p className="text-xs text-slate-500 mt-1 flex justify-end">
+            {formData.notes.length}/16
           </p>
         </div>
 
-        <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-md flex items-start space-x-2">
-          <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5" />
-          <div className="text-sm text-amber-800 dark:text-amber-300">
-            This record will be encrypted & securely stored on the blockchain,
-            powered by Arcium. Character limits ensure proper encryption.
+        <div className="bg-amber-900/20 border border-amber-700/30 p-4 rounded-xl flex items-start space-x-3 backdrop-blur-sm">
+          <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
+          <div className="text-sm text-amber-200/90 leading-relaxed">
+            This record will be symmetrically encrypted and securely stored on the Solana blockchain,
+            powered by Arcium. Character limits ensure proper payload chunking for the RescueCipher encryption.
           </div>
         </div>
       </CardContent>
-      <CardFooter className="flex justify-end space-x-2 bg-gray-50 dark:bg-gray-800/50 p-4">
+      <CardFooter className="flex justify-end space-x-3 bg-slate-900/40 border-t border-slate-800/50 p-5">
         {onCancel && (
-          <Button variant="outline" onClick={onCancel}>
+          <Button variant="outline" onClick={onCancel} className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl">
             Cancel
           </Button>
         )}
         <Button
           onClick={handleSubmit}
           disabled={isSaving}
-          className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700"
+          className="bg-[#004DFF] hover:bg-blue-600 text-white rounded-xl px-6 shadow-lg shadow-blue-900/20 transition-all font-medium"
         >
           {isSaving ? (
             <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-              Saving...
+              <div className="w-4 h-4 border-2 border-white/80 border-t-transparent rounded-full animate-spin mr-2"></div>
+              Encrypting & Saving...
             </>
           ) : (
             <>
               <Save className="w-4 h-4 mr-2" />
-              Save Record
+              Save Record On-Chain
             </>
           )}
         </Button>

@@ -11,7 +11,6 @@ import {
   Video,
   MessageCircle,
   Star,
-  Bell,
   Plus,
   AlertCircle,
   Wallet,
@@ -24,7 +23,6 @@ import {
   Settings,
   Menu,
   X,
-  CheckCircle2,
 } from "lucide-react";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
@@ -45,6 +43,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { NotificationDropdown } from "@/components/NotificationDropdown";
 
 // ---- Types ----
 
@@ -140,7 +140,7 @@ function AppointmentRow({
   router: ReturnType<typeof useRouter>;
 }) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 dark:bg-slate-900 rounded-xl transition-colors group">
+    <div className="flex items-center justify-between px-4 py-3 my-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 dark:bg-slate-900 rounded-xl transition-colors group">
       <div className="flex items-center space-x-4 min-w-0">
         <div className="relative flex-shrink-0">
           <Avatar className="w-11 h-11 border-2 border-white shadow-sm">
@@ -346,6 +346,7 @@ export default function DoctorDashboard() {
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [searchQuery, setSearchQuery] = useState("");
   const [availabilityOpen, setAvailabilityOpen] = useState(false);
+  const [chartData, setChartData] = useState<{ day: string; consultations: number }[]>([]);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -395,6 +396,8 @@ export default function DoctorDashboard() {
           .from("schedules")
           .select("*")
           .eq("doctor_id", doctorProfile.id)
+          .eq("status", "confirmed")
+          .gte("scheduled_date", new Date().toISOString().split("T")[0])
           .order("scheduled_date", { ascending: true })
           .order("start_time", { ascending: true })
           .limit(8);
@@ -445,6 +448,33 @@ export default function DoctorDashboard() {
     };
     fetchAppointments();
   }, [doctorProfile?.id, toast]);
+
+  // Fetch chart data — consultations per day over the last 7 days
+  useEffect(() => {
+    const fetchChartData = async () => {
+      if (!doctorProfile?.id) return;
+      try {
+        const days: { day: string; consultations: number }[] = [];
+        const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        for (let i = 6; i >= 0; i--) {
+          const d = new Date();
+          d.setDate(d.getDate() - i);
+          const dateStr = d.toISOString().split("T")[0];
+          const { count } = await supabase
+            .from("schedules")
+            .select("*", { count: "exact", head: true })
+            .eq("doctor_id", doctorProfile.id)
+            .eq("scheduled_date", dateStr)
+            .in("status", ["confirmed", "completed"]);
+          days.push({ day: dayNames[d.getDay()], consultations: count || 0 });
+        }
+        setChartData(days);
+      } catch {
+        setChartData([]);
+      }
+    };
+    fetchChartData();
+  }, [doctorProfile?.id]);
 
   const handlePatientClick = async (patientId: string) => {
     if (!patientId) return;
@@ -503,8 +533,7 @@ export default function DoctorDashboard() {
     },
   ];
 
-  const barHeights = [40, 70, 45, 90, 65, 85, 55];
-  const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
 
   if (error) {
     return (
@@ -693,11 +722,8 @@ export default function DoctorDashboard() {
               <DollarSign size={16} />
               <span>Withdraw</span>
             </button>
-            {/* Bell */}
-            <button className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl relative transition">
-              <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white dark:border-slate-900" />
-            </button>
+            {/* Notifications */}
+            <NotificationDropdown userId={doctorProfile?.user_profile_id || ""} />
             {/* Availability CTA */}
             <button
               onClick={() => setAvailabilityOpen(true)}
@@ -819,34 +845,45 @@ export default function DoctorDashboard() {
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-base font-bold flex items-center gap-2">
                     <Activity className="text-emerald-600" size={18} />
-                    Patient Activity
+                    Consultation Activity
                   </h2>
-                  <select className="bg-slate-50 dark:bg-slate-900 border-none text-xs font-bold rounded-lg px-3 py-1 outline-none text-slate-600">
-                    <option>Last 7 Days</option>
-                    <option>Last 30 Days</option>
-                  </select>
+                  <span className="text-xs font-bold text-slate-400 dark:text-slate-500">Last 7 Days</span>
                 </div>
-                <div className="h-48 w-full bg-slate-50 dark:bg-slate-900 rounded-xl flex items-end justify-between px-4 py-4 gap-2">
-                  {barHeights.map((height, i) => (
-                    <motion.div
-                      key={i}
-                      initial={{ height: 0 }}
-                      animate={{ height: `${height}%` }}
-                      transition={{ delay: i * 0.08, duration: 0.6, ease: "easeOut" }}
-                      className="flex-1 bg-[#004DFF]/15 rounded-t-lg relative group cursor-pointer"
-                    >
-                      <div
-                        className="absolute inset-x-0 bottom-0 bg-[#004DFF] rounded-t-lg group-hover:bg-blue-700 transition-colors"
-                        style={{ height: "60%" }}
+                {chartData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={chartData} barCategoryGap="20%">
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                      <XAxis
+                        dataKey="day"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 11, fontWeight: 700, fill: "#94a3b8" }}
                       />
-                    </motion.div>
-                  ))}
-                </div>
-                <div className="flex justify-between mt-3 px-1 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                  {dayLabels.map((d) => (
-                    <span key={d}>{d}</span>
-                  ))}
-                </div>
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 11, fontWeight: 600, fill: "#94a3b8" }}
+                        allowDecimals={false}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: "#1e293b",
+                          border: "none",
+                          borderRadius: "12px",
+                          color: "#fff",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                        }}
+                        cursor={{ fill: "rgba(0,77,255,0.06)" }}
+                      />
+                      <Bar dataKey="consultations" fill="#004DFF" radius={[8, 8, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[200px] flex items-center justify-center text-slate-400 dark:text-slate-500 text-sm">
+                    No consultation data for this period
+                  </div>
+                )}
               </section>
             </div>
 

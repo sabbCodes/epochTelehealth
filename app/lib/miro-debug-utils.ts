@@ -6,16 +6,16 @@
 // Test 1: Check if Miro SDK is accessible
 function testMiroSDKAccess() {
   console.log("=== Testing Miro SDK Access ===");
-  console.log("window.miro:", typeof window.miro);
-  console.log("window.miroBoardsPicker:", typeof window.miroBoardsPicker);
+  console.log("window.miro:", typeof (window as any).miro);
+  console.log("window.miroBoardsPicker:", typeof (window as any).miroBoardsPicker);
 
-  if (window.miro) {
+  if ((window as any).miro) {
     console.log("✅ window.miro is available");
   }
-  if (window.miroBoardsPicker) {
+  if ((window as any).miroBoardsPicker) {
     console.log("✅ window.miroBoardsPicker is available");
   }
-  if (!window.miro && !window.miroBoardsPicker) {
+  if (!(window as any).miro && !(window as any).miroBoardsPicker) {
     console.log("❌ Neither Miro SDK is loaded");
   }
 }
@@ -30,7 +30,7 @@ function loadMiroSDK() {
 
   script.onload = () => {
     console.log("✅ Primary SDK loaded successfully");
-    console.log("window.miro available:", !!window.miro);
+    console.log("window.miro available:", !!(window as any).miro);
   };
 
   script.onerror = () => {
@@ -105,7 +105,7 @@ async function testMiroIntegration() {
   }
 
   // Step 3: Load SDK if needed
-  if (!window.miroBoardsPicker) {
+  if (!(window as any).miroBoardsPicker) {
     console.log("\n3️⃣ Loading Miro SDK...");
     loadMiroSDK();
 
@@ -116,7 +116,7 @@ async function testMiroIntegration() {
 
   // Step 4: Check again
   console.log("\n4️⃣ Checking SDK again...");
-  if (window.miroBoardsPicker) {
+  if ((window as any).miroBoardsPicker) {
     console.log("✅ Miro SDK is ready to use!");
   } else {
     console.error("❌ Miro SDK still not available after 3 seconds");
@@ -127,7 +127,7 @@ async function testMiroIntegration() {
 async function openMiroTest() {
   console.log("=== Opening Miro BoardsPicker ===");
 
-  if (!window.miroBoardsPicker) {
+  if (!(window as any).miroBoardsPicker) {
     console.error("❌ Miro SDK not loaded. Run testMiroIntegration() first");
     return;
   }
@@ -140,15 +140,15 @@ async function openMiroTest() {
 
     const { token } = await tokenResponse.json();
 
-    window.miroBoardsPicker.open({
+    (window as any).miroBoardsPicker.open({
       clientId: process.env.NEXT_PUBLIC_MIRO_CLIENT_ID,
       action: "access-link",
       allowCreateAnonymousBoards: true,
       getToken: () => Promise.resolve(token),
-      success: (data) => {
+      success: (data: any) => {
         console.log("✅ Board selected:", data);
       },
-      error: (error) => {
+      error: (error: any) => {
         console.error("❌ Miro error:", error);
       },
       cancel: () => {

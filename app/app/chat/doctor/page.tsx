@@ -23,6 +23,7 @@ import {
   MicOff,
   ArrowLeft,
   Menu,
+  Pill,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -41,6 +42,7 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { HealthRecordForm } from "@/components/health-record-form"
+import { PrescriptionForm } from "@/components/prescription-form"
 import { supabase } from "@/lib/supabase"
 
 export default function DoctorChatPage() {
@@ -51,6 +53,7 @@ export default function DoctorChatPage() {
   const [isRecording, setIsRecording] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
   const [showHealthRecord, setShowHealthRecord] = useState(false)
+  const [showPrescription, setShowPrescription] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const searchParams = useSearchParams()
 
@@ -60,9 +63,11 @@ export default function DoctorChatPage() {
     id: string
     doctor_id: string
     patient_id: string
+    end_requested_by?: string | null
     status: string
   }>(null)
   const [authUserId, setAuthUserId] = useState<string | null>(null)
+  const [didIRequestEnd, setDidIRequestEnd] = useState(false)
   const [doctorUserId, setDoctorUserId] = useState<string | null>(null)
   const [patientUserId, setPatientUserId] = useState<string | null>(null)
   const [patientProfile, setPatientProfile] = useState<{
@@ -169,6 +174,12 @@ export default function DoctorChatPage() {
         (payload: ScheduleUpdatePayload) => {
           const newStatus = payload.new.status;
           setSessionStatus(newStatus);
+          
+          // Update local schedule state with the new end_requested_by
+          setSchedule(prev => prev ? { ...prev, end_requested_by: payload.new.end_requested_by as string | null } : null);
+          
+          // If the session is no longer pending_end, reset the local flag
+          if (newStatus !== 'pending_end') setDidIRequestEnd(false);
           
           if (newStatus === 'disputed') {
             // Set dispute start time when status changes to disputed
@@ -398,52 +409,47 @@ export default function DoctorChatPage() {
           (payload) => {
             const m = payload.new as MessageRow
             
-            // Skip if we've already processed this message
-            if (processedMessageIds.has(m.id)) {
-              console.log('Skipping duplicate message:', m.id)
-              return
-            }
-            
-            // Add to processed messages
+            // Skip if we've already processed this confirmed DB message ID
+            if (processedMessageIds.has(m.id)) return
             processedMessageIds.add(m.id)
             
-            // Only keep the last 100 message IDs to prevent memory leaks
+            // Trim the processed IDs set to prevent memory leaks
             if (processedMessageIds.size > 100) {
               const ids = Array.from(processedMessageIds).slice(-100)
               processedMessageIds.clear()
               ids.forEach(id => processedMessageIds.add(id))
             }
             
-            // Only add the message if it's not from the current user
-            // (since we already added it optimistically)
-            if (m.sender_id === authUserId) {
-              console.log('Skipping own message in realtime update:', m.id)
-              return
-            }
-            
             setMessages((prev) => {
-              // Check if message already exists (by ID or content + timestamp)
-              const messageExists = prev.some(pm => 
-                pm.id === m.id || 
-                (pm.content === m.content && 
-                 Math.abs(new Date(pm.timestamp).getTime() - new Date(m.created_at).getTime()) < 1000)
+              // If this message was sent by us, replace the optimistic temp entry
+              // (matched by content) so it gets the real DB id and timestamp.
+              // If it's from the other party, just append as a new message.
+              const tempIndex = prev.findIndex(
+                (pm) => pm.id.startsWith('temp-') && pm.content === m.content
               )
-              
-              if (messageExists) return prev
-              
-              return [
-                ...prev,
-                {
-                  id: m.id,
-                  sender: m.sender_id === doctorUserId ? "doctor" : "patient",
-                  content: m.content,
-                  timestamp: new Date(m.created_at).toLocaleTimeString([], { 
-                    hour: "2-digit", 
-                    minute: "2-digit" 
-                  }),
-                  type: "text",
-                },
-              ]
+
+              const confirmed = {
+                id: m.id,
+                sender: m.sender_id === doctorUserId ? 'doctor' as const : 'patient' as const,
+                content: m.content,
+                timestamp: new Date(m.created_at).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+                type: 'text' as const,
+              }
+
+              if (tempIndex !== -1) {
+                // Swap out the temp optimistic entry with the real one
+                const updated = [...prev]
+                updated[tempIndex] = confirmed
+                return updated
+              }
+
+              // Guard against exact ID duplicates
+              if (prev.some(pm => pm.id === m.id)) return prev
+
+              return [...prev, confirmed]
             })
           }
         )
@@ -465,10 +471,10 @@ export default function DoctorChatPage() {
       name: `${patientProfile?.first_name || 'Patient'} ${patientProfile?.last_name || ''}`.trim() || 'Patient',
       age: calculateAge(patientProfile?.date_of_birth),
       avatar: patientProfile?.profile_image || "/placeholder.svg?height=40&width=40",
-      lastMessage: messages.length > 0 ? messages[messages.length - 1].content : "No messages yet",
-      timestamp: messages.length > 0 ? messages[messages.length - 1].timestamp : "",
-      unread: 0, // You can implement unread count logic if needed
-      online: true, // You can implement online status if needed
+      lastMessage: "Tap to view conversation",
+      timestamp: "",
+      unread: 0,
+      online: true,
       condition: scheduleNote || "No notes available",
     },
   ]
@@ -536,16 +542,16 @@ export default function DoctorChatPage() {
     .join("")
 
   return (
-    <div className="h-screen bg-gray-50 dark:bg-gray-900 flex relative">
+    <div className="h-screen bg-slate-950 flex relative">
       {/* Mobile Overlay */}
       {showSidebar && (
-        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setShowSidebar(false)} />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden" onClick={() => setShowSidebar(false)} />
       )}
 
-      {/* Dispute Resolution Banner - Shows when session is in disputed status */}
+      {/* Dispute Resolution Banner */}
       {sessionStatus === 'disputed' && showDisputeBanner && (
         <div 
-          className="fixed left-1/2 transform -translate-x-1/2 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 shadow-lg max-w-2xl w-full z-50"
+          className="fixed left-1/2 transform -translate-x-1/2 bg-amber-900/40 backdrop-blur-xl border border-amber-700/50 rounded-2xl p-4 shadow-2xl max-w-2xl w-full z-50"
           style={{ 
             bottom: '100px',
             maxHeight: '200px',
@@ -555,29 +561,29 @@ export default function DoctorChatPage() {
           {/* Close button */}
           <button 
             onClick={() => setShowDisputeBanner(false)}
-            className="absolute top-2 right-2 p-1 rounded-full hover:bg-yellow-100 dark:hover:bg-yellow-800/50"
+            className="absolute top-2 right-2 p-1 rounded-full hover:bg-amber-800/50 transition"
             aria-label="Close banner"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-600 dark:text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex-1">
-              <h3 className="font-medium text-yellow-800 dark:text-yellow-200">
+              <h3 className="font-medium text-amber-200">
                 ⚠️ Dispute in Progress
               </h3>
-              <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                The patient has filed a dispute. You have <span className="font-mono font-bold">{timeLeft}</span> to resolve this with the patient before support intervenes.
+              <p className="text-sm text-amber-300/80 mt-1">
+                The patient has filed a dispute. You have <span className="font-mono font-bold text-amber-200">{timeLeft}</span> to resolve this with the patient before support intervenes.
               </p>
-              <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+              <p className="text-xs text-amber-400/60 mt-2">
                 Note: Support will review the dispute and make a final decision if not resolved.
               </p>
               <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto mt-3">
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700"
+                  className="bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200"
                   onClick={() => window.open("https://t.me/+AyXlku_fTwA2ZGJk", "_blank")}
                 >
                   Contact Support
@@ -590,16 +596,16 @@ export default function DoctorChatPage() {
 
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-30 w-72 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 transform ${
+        className={`fixed inset-y-0 left-0 z-30 w-72 bg-slate-900/95 backdrop-blur-xl border-r border-slate-800/50 transform ${
           showSidebar ? "translate-x-0" : "-translate-x-full"
         } transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0`}
       >
         {/* Header */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-b border-slate-800/50">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">My Patients</h1>
+            <h1 className="text-xl font-bold text-white">My Patients</h1>
             <div className="flex items-center space-x-2">
-              <Button size="sm" variant="ghost" className="lg:hidden" onClick={() => setShowSidebar(false)}>
+              <Button size="sm" variant="ghost" className="lg:hidden text-slate-400 hover:text-white hover:bg-slate-800" onClick={() => setShowSidebar(false)}>
                 <ArrowLeft className="w-4 h-4" />
               </Button>
             </div>
@@ -607,30 +613,30 @@ export default function DoctorChatPage() {
 
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input placeholder="Search patients..." className="pl-10" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-4 h-4" />
+            <Input placeholder="Search patients..." className="pl-10 bg-slate-800/80 border-slate-700/50 text-white placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-[#004DFF]/30" />
           </div>
         </div>
 
         {/* Patient List */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
           {patients.map((patient) => (
             <motion.div
               key={patient.id}
-              whileHover={{ backgroundColor: "rgba(59, 130, 246, 0.05)" }}
+              whileHover={{ backgroundColor: "rgba(0, 77, 255, 0.05)" }}
               onClick={() => {
                 setSelectedChat(patient.id)
                 setShowSidebar(false)
               }}
-              className={`p-4 cursor-pointer border-b border-gray-100 dark:border-gray-700 ${
-                selectedChat === patient.id ? "bg-blue-50 dark:bg-blue-900/20" : ""
+              className={`p-4 cursor-pointer border-b border-slate-800/50 transition-colors ${
+                selectedChat === patient.id ? "bg-[#004DFF]/10 border-l-2 border-l-[#004DFF]" : ""
               }`}
             >
               <div className="flex items-center space-x-3">
                 <div className="relative">
                   <Avatar>
                     <AvatarImage src={patient.avatar || "/placeholder.svg"} />
-                    <AvatarFallback>
+                    <AvatarFallback className="bg-slate-700 text-white">
                       {patient.name
                         .split(" ")
                         .map((n) => n[0])
@@ -638,28 +644,28 @@ export default function DoctorChatPage() {
                     </AvatarFallback>
                   </Avatar>
                   {patient.online && (
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-400 border-2 border-slate-900 rounded-full"></div>
                   )}
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900 dark:text-white truncate">{patient.name}</h3>
-                    <span className="text-xs text-gray-500">{patient.timestamp}</span>
+                    <h3 className="font-semibold text-white truncate">{patient.name}</h3>
+                    <span className="text-[10px] text-slate-500">{patient.timestamp}</span>
                   </div>
 
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-300 truncate">{patient.lastMessage}</p>
+                      <p className="text-sm text-slate-400 truncate max-w-[150px]">{patient.lastMessage}</p>
                       <div className="flex items-center mt-1">
-                        <Users className="w-3 h-3 text-blue-600 mr-1" />
-                        <span className="text-xs text-gray-500">
+                        <Users className="w-3 h-3 text-[#004DFF] mr-1" />
+                        <span className="text-xs text-slate-500">
                           Age: {patient.age} • {patient.condition}
                         </span>
                       </div>
                     </div>
 
-                    {patient.unread > 0 && <Badge className="bg-blue-600 text-white text-xs">{patient.unread}</Badge>}
+                    {patient.unread > 0 && <Badge className="bg-[#004DFF] text-white text-xs">{patient.unread}</Badge>}
                   </div>
                 </div>
               </div>
@@ -670,17 +676,17 @@ export default function DoctorChatPage() {
 
       {/* End Session Confirmation Dialog */}
       <AlertDialog open={showEndSessionConfirm} onOpenChange={setShowEndSessionConfirm}>
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-slate-900 border-slate-700/50">
           <AlertDialogHeader>
-            <AlertDialogTitle>End Session?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-white">End Session?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">
               Are you sure you want to mark this session as completed? The patient will have 10 minutes to confirm or dispute the session.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700">Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              className="bg-green-600 hover:bg-green-700"
+              className="bg-emerald-600 hover:bg-emerald-700"
               onClick={async () => {
                 if (!appointmentId) return;
                 
@@ -688,7 +694,7 @@ export default function DoctorChatPage() {
                   .from('schedules')
                   .update({
                     status: 'pending_end',
-                    end_requested_by: (await supabase.auth.getUser()).data.user?.id,
+                    end_requested_by: authUserId,
                     updated_at: new Date().toISOString()
                   })
                   .eq('id', appointmentId);
@@ -698,7 +704,10 @@ export default function DoctorChatPage() {
                   return;
                 }
                 
+                const doctorId = (await supabase.auth.getUser()).data.user?.id;
                 setSessionStatus('pending_end');
+                setSchedule(prev => prev ? { ...prev, end_requested_by: doctorId } : null);
+                setDidIRequestEnd(true);
                 setShowEndSessionConfirm(false);
               }}
             >
@@ -713,52 +722,47 @@ export default function DoctorChatPage() {
         {selectedPatient ? (
           <>
             {/* Chat Header */}
-            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
+             <div className="bg-slate-900/80 backdrop-blur-xl border-b border-slate-800/50 p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <Button variant="ghost" size="sm" className="lg:hidden" onClick={() => setShowSidebar(true)}>
+                  <Button variant="ghost" size="sm" className="lg:hidden text-slate-400 hover:text-white hover:bg-slate-800" onClick={() => setShowSidebar(true)}>
                     <Menu className="w-4 h-4" />
                   </Button>
 
                   <div className="relative">
                     <Avatar>
                       <AvatarImage src={headerPatientAvatar} />
-                      <AvatarFallback>{headerPatientInitials}</AvatarFallback>
+                      <AvatarFallback className="bg-slate-700 text-white">{headerPatientInitials}</AvatarFallback>
                     </Avatar>
                     {selectedPatient.online && (
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-400 border-2 border-slate-900 rounded-full"></div>
                     )}
                   </div>
 
                   <div>
-                    <h2 className="font-semibold text-gray-900 dark:text-white">
+                    <h2 className="font-semibold text-white">
                       {patientProfile?.first_name} {patientProfile?.last_name}
                     </h2>
                     <div className="flex items-center space-x-2">
-                      <Users className="w-4 h-4 text-blue-600" />
-                      <span className="text-sm text-gray-600 dark:text-gray-300">
+                      <Users className="w-3.5 h-3.5 text-[#004DFF]" />
+                      <span className="text-xs text-slate-400">
                         Age: {calculateAge(patientProfile?.date_of_birth)}{scheduleNote && ' • ' + scheduleNote}
                       </span>
-                      {/* <span className="text-sm text-green-600">• Online</span> */}
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  {sessionStatus === 'pending_end' && (
-                    <div className="text-sm text-amber-600 bg-amber-50 px-3 py-1 rounded-md">
-                      Waiting for patient confirmation...
-                    </div>
-                  )}
                   <WalletMultiButton className="!bg-transparent !p-0 !h-auto !border-0 hover:!bg-transparent" />
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white hover:bg-slate-800">
                         <MoreVertical className="w-4 h-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" className="bg-slate-800 border-slate-700">
                       <DropdownMenuItem
+                        className="text-slate-200 hover:bg-slate-700 focus:bg-slate-700"
                         onClick={() => {
                           const { publicKey } = wallet;
                           if (!publicKey) {
@@ -775,10 +779,20 @@ export default function DoctorChatPage() {
                         <FileText className="w-4 h-4 mr-2" />
                         Medical Record
                       </DropdownMenuItem>
-                      {sessionStatus === 'active' && (
-                        <DropdownMenuItem onClick={() => setShowEndSessionConfirm(true)}>
+                      <DropdownMenuItem
+                        className="text-slate-200 hover:bg-slate-700 focus:bg-slate-700"
+                        onClick={() => setShowPrescription(true)}
+                      >
+                        <Pill className="w-4 h-4 mr-2 text-emerald-400" />
+                        Write Prescription
+                      </DropdownMenuItem>
+                      {sessionStatus !== 'completed' && sessionStatus !== 'pending_end' && sessionStatus !== 'disputed' && (
+                        <DropdownMenuItem
+                          className="text-red-400 hover:bg-slate-700 focus:bg-slate-700 hover:text-red-300 focus:text-red-300"
+                          onClick={() => setShowEndSessionConfirm(true)}
+                        >
                           <CheckCircle2 className="w-4 h-4 mr-2" />
-                          Mark as Completed
+                          End Session
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>
@@ -787,8 +801,86 @@ export default function DoctorChatPage() {
               </div>
             </div>
 
+            {/* Pending End Banner */}
+            <AnimatePresence>
+              {sessionStatus === 'pending_end' && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="bg-slate-900/40 backdrop-blur-md border-b border-slate-800/50 p-4"
+                >
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-blue-500/20 p-2 rounded-full">
+                        <CheckCircle2 className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <h4 className="text-white font-medium">Session End Requested</h4>
+                        <p className="text-xs text-slate-400">
+                          {didIRequestEnd 
+                            ? "Waiting for the patient to confirm the end of this session..." 
+                            : "Patient requested to end this session. Please confirm to conclude."}
+                        </p>
+                      </div>
+                    </div>
+                    {!didIRequestEnd && (
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={async () => {
+                            if (!appointmentId) return;
+                            const { error } = await supabase
+                              .from('schedules')
+                              .update({
+                                status: 'active',
+                                updated_at: new Date().toISOString()
+                              })
+                              .eq('id', appointmentId);
+                            if (!error) setSessionStatus('active');
+                          }}
+                          className="border-slate-700 text-slate-300 hover:bg-slate-800"
+                        >
+                          Decline End Request
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          onClick={async () => {
+                            /* Accept completion logic */
+                            if (!appointmentId) return;
+                            const { error } = await supabase
+                              .from('schedules')
+                              .update({
+                                status: 'completed',
+                                completed_at: new Date().toISOString(),
+                                updated_at: new Date().toISOString()
+                              })
+                              .eq('id', appointmentId);
+                            if (!error) setSessionStatus('completed');
+                          }}
+                          className="bg-[#004DFF] hover:bg-blue-600 text-white"
+                        >
+                          Accept & End
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+              <div className="flex justify-center mb-6 mt-2">
+                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-full px-4 py-1.5 flex items-center space-x-2 shadow-sm">
+                  <svg className="w-3.5 h-3.5 text-amber-400/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <span className="text-xs font-medium text-slate-400">Messages are end-to-end encrypted. No one outside of this chat, not even Epoch Telehealth, can read them.</span>
+                </div>
+              </div>
+
               <AnimatePresence>
                 {messages.map((msg) => (
                   <motion.div
@@ -798,15 +890,22 @@ export default function DoctorChatPage() {
                     className={`flex ${msg.sender === "doctor" ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className={`max-w-xs sm:max-w-sm lg:max-w-md ${
+                      className={`max-w-xs sm:max-w-sm lg:max-w-md px-4 py-2.5 shadow-md ${
                         msg.sender === "doctor"
-                          ? "bg-gradient-to-r from-blue-600 to-green-600 text-white"
-                          : "bg-white dark:bg-gray-700 text-gray-900 dark:text-white border"
-                      } rounded-lg p-3 shadow-sm`}
+                          ? "bubble-sent text-slate-50"
+                          : "bubble-received text-slate-200"
+                      }`}
                     >
-                      <p className="text-sm break-words">{msg.content}</p>
-                      <div className={`text-xs mt-1 ${msg.sender === "doctor" ? "text-blue-100" : "text-gray-500"}`}>
+                      <p className="text-sm leading-relaxed break-words">{msg.content}</p>
+                      <div className={`text-[10px] mt-1.5 flex items-center gap-1 ${
+                        msg.sender === "doctor" ? "text-blue-200/60 justify-end" : "text-slate-500 justify-start"
+                      }`}>
                         {msg.timestamp}
+                        {msg.sender === "doctor" && (
+                          <svg className="w-3 h-3 text-blue-200/50" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M12.354 4.354a.5.5 0 0 0-.708-.708L5 11.293 1.854 8.146a.5.5 0 1 0-.708.708l3.5 3.5a.5.5 0 0 0 .708 0l7-7zm-4.208 7.208l.708.708 7-7-.708-.708-7 7z"/>
+                          </svg>
+                        )}
                       </div>
                     </div>
                   </motion.div>
@@ -816,28 +915,28 @@ export default function DoctorChatPage() {
             </div>
 
             {/* Message Input */}
-            <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
+            <div className="bg-slate-900/80 border-t border-slate-800/50 p-4">
               <div className="flex items-end space-x-2">
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-2">
-                    <Button variant="ghost" size="sm">
+                    <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-300 hover:bg-slate-800">
                       <Paperclip className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="hidden sm:flex">
+                    <Button variant="ghost" size="sm" className="hidden sm:flex text-slate-500 hover:text-slate-300 hover:bg-slate-800">
                       <ImageIcon className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="hidden sm:flex">
+                    <Button variant="ghost" size="sm" className="hidden sm:flex text-slate-500 hover:text-slate-300 hover:bg-slate-800">
                       <Smile className="w-4 h-4" />
                     </Button>
                   </div>
 
                   {sessionStatus === 'completed' ? (
-                    <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                    <div className="text-center py-4 text-slate-400">
                       <p>This session has been completed. Messaging is no longer available.</p>
-                      <p className="text-sm mt-1">Please be patient while escrow release funds to your wallet.</p>
+                      <p className="text-sm mt-1 text-slate-500">Please be patient while escrow release funds to your wallet.</p>
                     </div>
                   ) : (
-                    <div className="border-t border-gray-200 dark:border-gray-700 p-4">
+                    <div className="border-t border-slate-800/50 pt-3">
                       <div className="flex items-center space-x-2">
                         <Textarea
                           value={message}
@@ -853,7 +952,7 @@ export default function DoctorChatPage() {
                           placeholder={sessionStatus === 'disputed' 
                             ? 'This session is under dispute. Please wait for resolution...' 
                             : 'Type your message...'}
-                          className="min-h-[90px] flex-1 resize-none"
+                          className="min-h-[90px] flex-1 resize-none bg-slate-800/80 border-slate-700/50 text-white placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-[#004DFF]/30"
                           disabled={isRecording || sessionStatus === 'disputed'}
                         />
                         <div className="flex flex-col space-y-2">
@@ -861,7 +960,7 @@ export default function DoctorChatPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => setIsRecording(!isRecording)}
-                            className={isRecording ? "text-red-600" : ""}
+                            className={isRecording ? "text-red-500" : "text-slate-400 hover:text-white hover:bg-slate-800"}
                             disabled={sessionStatus === 'disputed' || sessionStatus === 'completed'}
                           >
                             {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
@@ -870,14 +969,14 @@ export default function DoctorChatPage() {
                           <Button
                             onClick={sendMessage}
                             disabled={!message.trim() || sessionStatus === 'disputed' || sessionStatus === 'completed'}
-                            className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white"
+                            className="bg-[#004DFF] hover:bg-blue-600 text-white"
                           >
                             <Send className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
                       {sessionStatus === 'disputed' && (
-                        <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+                        <p className="text-xs text-amber-400/80 mt-2">
                           ⚠️ This session is under dispute. Please wait for the patient or support to resolve the issue.
                         </p>
                       )}
@@ -890,14 +989,14 @@ export default function DoctorChatPage() {
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Stethoscope className="w-8 h-8 text-gray-400" />
+              <div className="w-16 h-16 bg-slate-800 border border-slate-700/50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Stethoscope className="w-8 h-8 text-slate-500" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Select a patient</h3>
-              <p className="text-gray-600 dark:text-gray-300">
+              <h3 className="text-lg font-semibold text-white mb-2">Select a patient</h3>
+              <p className="text-slate-400">
                 Choose a patient from the sidebar to start consultation
               </p>
-              <Button className="mt-4 lg:hidden" onClick={() => setShowSidebar(true)}>
+              <Button className="mt-4 lg:hidden bg-[#004DFF] hover:bg-blue-600" onClick={() => setShowSidebar(true)}>
                 <Menu className="w-4 h-4 mr-2" />
                 Open Patient List
               </Button>
@@ -919,6 +1018,24 @@ export default function DoctorChatPage() {
                 setShowHealthRecord(false)
               }}
               onCancel={() => setShowHealthRecord(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Prescription Dialog */}
+      {showPrescription && selectedPatient && schedule && (
+        <Dialog open={showPrescription} onOpenChange={setShowPrescription}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-transparent border-none p-0">
+            <PrescriptionForm
+              patientName={selectedPatient.name}
+              patientId={schedule.patient_id}
+              doctorId={schedule.doctor_id}
+              appointmentId={appointmentId || ''}
+              onSave={() => {
+                setShowPrescription(false)
+              }}
+              onCancel={() => setShowPrescription(false)}
             />
           </DialogContent>
         </Dialog>

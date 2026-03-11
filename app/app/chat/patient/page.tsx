@@ -17,10 +17,12 @@ import {
   MicOff,
   ArrowLeft,
   Menu,
+  AlertCircle,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +38,7 @@ import { Textarea } from "@/components/ui/textarea"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase"
 import { formatName } from "@/lib/utils"
+import { CheckCircle2 } from "lucide-react"
 
 export default function PatientChatPage() {
   // Track the currently selected doctor's ID (string type to match database IDs)
@@ -52,8 +55,10 @@ export default function PatientChatPage() {
     id: string
     doctor_id: string
     patient_id: string
+    end_requested_by?: string | null
   }>(null)
   const [authUserId, setAuthUserId] = useState<string | null>(null)
+  const [didIRequestEnd, setDidIRequestEnd] = useState(false)
   const [doctorUserId, setDoctorUserId] = useState<string | null>(null)
   const [patientUserId, setPatientUserId] = useState<string | null>(null)
   const [doctorProfile, setDoctorProfile] = useState<{
@@ -186,6 +191,12 @@ export default function PatientChatPage() {
           (payload) => {
             const newStatus = payload.new.status;
             setSessionStatus(newStatus);
+            
+            // Update local schedule state with the new end_requested_by
+            setSchedule(prev => prev ? { ...prev, end_requested_by: payload.new.end_requested_by as string | null } : null);
+            
+            // If the session is no longer pending_end, reset the local flag
+            if (newStatus !== 'pending_end') setDidIRequestEnd(false);
             
             // If status changed to pending_end, start countdown
             if (newStatus === 'pending_end') {
@@ -359,10 +370,10 @@ export default function PatientChatPage() {
             name: `Dr. ${doctor.first_name || ''} ${doctor.last_name || ''}`.trim() || 'Doctor',
             specialty: doctor.specialization || 'General Practice',
             avatar: doctor.profile_image || "/placeholder.svg?height=40&width=40",
-            lastMessage: messages.length > 0 ? messages[messages.length - 1].content : "No messages yet",
-            timestamp: messages.length > 0 ? messages[messages.length - 1].timestamp : "",
-            unread: 0, // You can implement unread count logic if needed
-            online: true, // You can implement online status if needed
+            lastMessage: "Tap to view conversation",
+            timestamp: "",
+            unread: 0,
+            online: true,
           }));
           
           setDoctors(formattedDoctors);
@@ -382,7 +393,8 @@ export default function PatientChatPage() {
     return () => {
       cancelled = true;
     };
-  }, [schedule, messages, selectedChat]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schedule]);
 
   // Load messages and subscribe to realtime
   useEffect(() => {
@@ -443,52 +455,47 @@ export default function PatientChatPage() {
           (payload) => {
             const m = payload.new as MessageRow
             
-            // Skip if we've already processed this message
-            if (processedMessageIds.has(m.id)) {
-              console.log('Skipping duplicate message:', m.id)
-              return
-            }
-            
-            // Add to processed messages
+            // Skip if we've already processed this confirmed DB message ID
+            if (processedMessageIds.has(m.id)) return
             processedMessageIds.add(m.id)
             
-            // Only keep the last 100 message IDs to prevent memory leaks
+            // Trim the processed IDs set to prevent memory leaks
             if (processedMessageIds.size > 100) {
               const ids = Array.from(processedMessageIds).slice(-100)
               processedMessageIds.clear()
               ids.forEach(id => processedMessageIds.add(id))
             }
             
-            // Only add the message if it's not from the current user
-            // (since we already added it optimistically)
-            if (m.sender_id === authUserId) {
-              console.log('Skipping own message in realtime update:', m.id)
-              return
-            }
-            
             setMessages((prev) => {
-              // Check if message already exists (by ID or content + timestamp)
-              const messageExists = prev.some(pm => 
-                pm.id === m.id || 
-                (pm.content === m.content && 
-                 Math.abs(new Date(pm.timestamp).getTime() - new Date(m.created_at).getTime()) < 1000)
+              // If this message was sent by us, replace the optimistic temp entry
+              // (matched by content) so it gets the real DB id and timestamp.
+              // If it's from the other party, just append as a new message.
+              const tempIndex = prev.findIndex(
+                (pm) => pm.id.startsWith('temp-') && pm.content === m.content
               )
-              
-              if (messageExists) return prev
-              
-              return [
-                ...prev,
-                {
-                  id: m.id,
-                  sender: m.sender_id === doctorUserId ? "doctor" : "patient",
-                  content: m.content,
-                  timestamp: new Date(m.created_at).toLocaleTimeString([], { 
-                    hour: "2-digit", 
-                    minute: "2-digit" 
-                  }),
-                  type: "text",
-                },
-              ]
+
+              const confirmed = {
+                id: m.id,
+                sender: m.sender_id === doctorUserId ? 'doctor' as const : 'patient' as const,
+                content: m.content,
+                timestamp: new Date(m.created_at).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+                type: 'text' as const,
+              }
+
+              if (tempIndex !== -1) {
+                // Swap out the temp optimistic entry with the real one
+                const updated = [...prev]
+                updated[tempIndex] = confirmed
+                return updated
+              }
+
+              // Guard against exact ID duplicates
+              if (prev.some(pm => pm.id === m.id)) return prev
+
+              return [...prev, confirmed]
             })
           }
         )
@@ -798,10 +805,10 @@ export default function PatientChatPage() {
 
 
   return (
-    <div className="h-screen bg-gray-50 dark:bg-gray-900 flex relative">
+    <div className="h-screen bg-slate-950 flex relative">
       {/* Mobile Overlay */}
       {showSidebar && (
-        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setShowSidebar(false)} />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden" onClick={() => setShowSidebar(false)} />
       )}
 
       {/* Sidebar - Doctor List */}
@@ -809,16 +816,16 @@ export default function PatientChatPage() {
         className={`
         ${showSidebar ? "translate-x-0" : "-translate-x-full"}
         lg:translate-x-0 fixed lg:relative z-50 lg:z-auto
-        w-80 lg:w-80 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 
+        w-80 lg:w-80 bg-slate-900/95 backdrop-blur-xl border-r border-slate-800/50 
         flex flex-col transition-transform duration-300 ease-in-out h-full
       `}
       >
         {/* Header */}
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+        <div className="p-4 border-b border-slate-800/50">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-xl font-bold text-gray-900 dark:text-white">My Doctors</h1>
+            <h1 className="text-xl font-bold text-white">My Doctors</h1>
             <div className="flex items-center space-x-2">
-              <Button size="sm" variant="ghost" className="lg:hidden" onClick={() => setShowSidebar(false)}>
+              <Button size="sm" variant="ghost" className="lg:hidden text-slate-400 hover:text-white hover:bg-slate-800" onClick={() => setShowSidebar(false)}>
                 <ArrowLeft className="w-4 h-4" />
               </Button>
             </div>
@@ -826,30 +833,30 @@ export default function PatientChatPage() {
 
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-            <Input placeholder="Search doctors..." className="pl-10" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-4 h-4" />
+            <Input placeholder="Search doctors..." className="pl-10 bg-slate-800/80 border-slate-700/50 text-white placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-[#004DFF]/30" />
           </div>
         </div>
 
         {/* Doctor List */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto custom-scrollbar">
           {doctors.map((doctor) => (
             <motion.div
               key={doctor.id}
-              whileHover={{ backgroundColor: "rgba(59, 130, 246, 0.05)" }}
+              whileHover={{ backgroundColor: "rgba(0, 77, 255, 0.05)" }}
               onClick={() => {
                 setSelectedChat(doctor.id)
                 setShowSidebar(false)
               }}
-              className={`p-4 cursor-pointer border-b border-gray-100 dark:border-gray-700 ${
-                selectedChat === doctor.id ? "bg-blue-50 dark:bg-blue-900/20" : ""
+              className={`p-4 cursor-pointer border-b border-slate-800/50 transition-colors ${
+                selectedChat === doctor.id ? "bg-[#004DFF]/10 border-l-2 border-l-[#004DFF]" : ""
               }`}
             >
               <div className="flex items-center space-x-3">
                 <div className="relative">
                   <Avatar>
                     <AvatarImage src={doctor.avatar || "/placeholder.svg"} />
-                    <AvatarFallback>
+                    <AvatarFallback className="bg-slate-700 text-white">
                       {doctor.name
                         .split(" ")
                         .map((n) => n[0])
@@ -857,26 +864,26 @@ export default function PatientChatPage() {
                     </AvatarFallback>
                   </Avatar>
                   {doctor.online && (
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-400 border-2 border-slate-900 rounded-full"></div>
                   )}
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900 dark:text-white truncate">{doctor.name}</h3>
-                    <span className="text-xs text-gray-500">{doctor.timestamp}</span>
+                    <h3 className="font-semibold text-white truncate">{doctor.name}</h3>
+                    <span className="text-[10px] text-slate-500">{doctor.timestamp}</span>
                   </div>
 
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600 dark:text-gray-300 truncate">{doctor.lastMessage}</p>
+                      <p className="text-sm text-slate-400 truncate max-w-[180px]">{doctor.lastMessage}</p>
                       <div className="flex items-center mt-1">
-                        <Stethoscope className="w-3 h-3 text-blue-600 mr-1" />
-                        <span className="text-xs text-gray-500">{doctor.specialty}</span>
+                        <Stethoscope className="w-3 h-3 text-[#004DFF] mr-1" />
+                        <span className="text-xs text-slate-500">{doctor.specialty}</span>
                       </div>
                     </div>
 
-                    {doctor.unread > 0 && <Badge className="bg-blue-600 text-white text-xs">{doctor.unread}</Badge>}
+                    {doctor.unread > 0 && <Badge className="bg-[#004DFF] text-white text-xs">{doctor.unread}</Badge>}
                   </div>
                 </div>
               </div>
@@ -885,33 +892,35 @@ export default function PatientChatPage() {
         </div>
       </div>
 
-      {/* Dispute Resolution Banner - Shows when session is in disputed status */}
+      {/* Dispute Resolution Banner */}
       {sessionStatus === 'disputed' && showDisputeBanner && (
-        <div className="fixed left-1/2 transform -translate-x-1/2 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 shadow-lg max-w-2xl w-full z-50"
+        <div 
+          className="fixed left-1/2 transform -translate-x-1/2 bg-amber-900/40 backdrop-blur-xl border border-amber-700/50 rounded-2xl p-4 shadow-2xl max-w-2xl w-full z-50"
           style={{ 
             bottom: '100px',
             maxHeight: '200px',
             overflowY: 'auto'
-          }}>
+          }}
+        >
           {/* Close button */}
           <button 
             onClick={() => setShowDisputeBanner(false)}
-            className="absolute top-2 right-2 p-1 rounded-full hover:bg-yellow-100 dark:hover:bg-yellow-800/50"
+            className="absolute top-2 right-2 p-1 rounded-full hover:bg-amber-800/50 transition"
             aria-label="Close banner"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-600 dark:text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex-1">
-              <h3 className="font-medium text-yellow-800 dark:text-yellow-200">
+              <h3 className="font-medium text-amber-200">
                 ⚠️ Dispute in Progress
               </h3>
-              <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                You&apos;ve filed a dispute. You have <span className="font-mono font-bold">{timeLeft}</span> to resolve this with the doctor before support intervenes.
+              <p className="text-sm text-amber-300/80 mt-1">
+                You&apos;ve filed a dispute. You have <span className="font-mono font-bold text-amber-200">{timeLeft}</span> to resolve this with the doctor before support intervenes.
               </p>
-              <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+              <p className="text-xs text-amber-400/60 mt-2">
                 Note: False disputes may result in account suspension. Please resolve amicably if possible.
               </p>
             </div>
@@ -919,9 +928,8 @@ export default function PatientChatPage() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="bg-white hover:bg-gray-50 dark:bg-gray-800 dark:hover:bg-gray-700"
+                className="bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200"
                 onClick={async () => {
-                  // Open chat with support
                   window.open("https://t.me/+AyXlku_fTwA2ZGJk", "_blank");
                 }}
               >
@@ -930,7 +938,7 @@ export default function PatientChatPage() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200 dark:bg-green-900/30 dark:border-green-800 dark:text-green-200 dark:hover:bg-green-900/50"
+                className="bg-emerald-900/30 hover:bg-emerald-900/50 text-emerald-300 border-emerald-700/50"
                 onClick={async () => {
                   if (!appointmentId) return;
                   const { error } = await supabase
@@ -950,7 +958,7 @@ export default function PatientChatPage() {
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="text-red-600 border-red-200 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/50"
+                className="text-red-400 border-red-700/50 hover:bg-red-900/30"
                 onClick={async () => {
                   if (!appointmentId) return;
                   const { error } = await supabase
@@ -977,14 +985,14 @@ export default function PatientChatPage() {
 
       {/* Dispute Dialog */}
       <AlertDialog open={showDisputeDialog} onOpenChange={setShowDisputeDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="bg-slate-900 border-slate-700/50">
           <AlertDialogHeader>
-            <AlertDialogTitle>⚠️ Open Dispute</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>Please provide a reason for disputing this session. This will be reviewed by our support team within 24 hours.</p>
-              <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md border border-yellow-100 dark:border-yellow-800">
-                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">Important Notice</p>
-                <ul className="text-xs text-yellow-700 dark:text-yellow-300 list-disc pl-5 mt-1 space-y-1">
+            <AlertDialogTitle className="text-white">⚠️ Open Dispute</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p className="text-slate-400">Please provide a reason for disputing this session. This will be reviewed by our support team.</p>
+              <div className="bg-amber-900/20 p-4 rounded-xl border border-amber-700/30">
+                <p className="text-sm font-semibold text-amber-400">Important Notice</p>
+                <ul className="text-xs text-amber-200/80 list-disc pl-5 mt-2 space-y-1">
                   <li>Both parties have 24 hours to resolve the dispute amicably</li>
                   <li>False disputes may result in account suspension</li>
                   <li>Support will review and make a final decision if unresolved</li>
@@ -992,18 +1000,18 @@ export default function PatientChatPage() {
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="space-y-4">
+          <div className="space-y-4 pt-2">
             <Textarea
               placeholder="Please describe the issue in detail..."
               value={disputeReason}
               onChange={(e) => setDisputeReason(e.target.value)}
-              className="min-h-[120px]"
+              className="min-h-[120px] bg-slate-800/80 border-slate-700 text-white placeholder:text-slate-500 rounded-xl focus:ring-1 focus:ring-[#004DFF]"
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700">Cancel</AlertDialogCancel>
             <AlertDialogAction 
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-amber-600 hover:bg-amber-700 text-white"
               disabled={!disputeReason.trim()}
               onClick={async () => {
                 if (!appointmentId) return;
@@ -1038,88 +1046,172 @@ export default function PatientChatPage() {
         {selectedDoctor ? (
           <>
             {/* Chat Header */}
-            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4">
+            <div className="bg-slate-900/80 backdrop-blur-xl border-b border-slate-800/50 p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
-                  <Button variant="ghost" size="sm" className="lg:hidden" onClick={() => setShowSidebar(true)}>
+                  <Button variant="ghost" size="sm" className="lg:hidden text-slate-400 hover:text-white hover:bg-slate-800" onClick={() => setShowSidebar(true)}>
                     <Menu className="w-4 h-4" />
                   </Button>
 
                   <div className="relative">
                     <Avatar>
                       <AvatarImage src={headerDoctorAvatar} />
-                      <AvatarFallback>{headerDoctorInitials}</AvatarFallback>
+                      <AvatarFallback className="bg-slate-700 text-white">{headerDoctorInitials}</AvatarFallback>
                     </Avatar>
                     {selectedDoctor.online && (
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white dark:border-gray-800 rounded-full"></div>
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-400 border-2 border-slate-900 rounded-full"></div>
                     )}
                   </div>
 
                   <div>
-                    <h2 className="font-semibold text-gray-900 dark:text-white">{headerDoctorName}</h2>
+                    <h2 className="font-semibold text-white">{headerDoctorName}</h2>
                     <div className="flex items-center space-x-2">
-                      <Stethoscope className="w-4 h-4 text-blue-600" />
-                      <span className="text-sm text-gray-600 dark:text-gray-300">{headerDoctorSpecialty}</span>
-                      {selectedDoctor.online && <span className="text-sm text-green-600">• Online</span>}
+                      <Stethoscope className="w-3.5 h-3.5 text-[#004DFF]" />
+                      <span className="text-xs text-slate-400">{headerDoctorSpecialty}</span>
+                      {selectedDoctor.online && <span className="text-xs text-emerald-400">• Online</span>}
                     </div>
                   </div>
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  {sessionStatus === 'pending_end' && countdown !== null && countdown > 0 ? (
-                  <div className="flex items-center space-x-2">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => setShowDisputeDialog(true)}
-                      className="text-amber-600 border-amber-300 hover:bg-amber-50"
-                    >
-                      Open Dispute
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      className="bg-green-600 hover:bg-green-700 text-white"
-                      onClick={async () => {
-                        if (!appointmentId) return;
-                        
-                        const { error } = await supabase
-                          .from('schedules')
-                          .update({
-                            status: 'completed',
-                            ended_at: new Date().toISOString(),
-                            updated_at: new Date().toISOString()
-                          })
-                          .eq('id', appointmentId);
-                        
-                        if (error) {
-                          console.error('Error completing session:', error);
-                          return;
-                        }
-                        
-                        setSessionStatus('completed');
-                        // Redirect to payment page
-                        window.location.href = '/payment';
-                      }}
-                    >
-                      End Session
-                    </Button>
-                  </div>
-                ) : (
-                  <Link href="/payment">
-                    <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white">
-                      End Session
-                    </Button>
-                  </Link>
-                )}
-                  <Button variant="ghost" size="sm">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white hover:bg-slate-800">
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-slate-800 border-slate-700">
+                      {/* End Session – visible as long as the session hasn't ended */}
+                      {sessionStatus !== 'completed' && sessionStatus !== 'pending_end' && sessionStatus !== 'disputed' && (
+                        <DropdownMenuItem 
+                          className="text-red-400 hover:bg-slate-700 focus:bg-slate-700 hover:text-red-300 focus:text-red-300" 
+                          onClick={async () => {
+                            if (!appointmentId) return;
+                            // Fetch user id fresh at click time to avoid null race
+                            const { data: { user } } = await supabase.auth.getUser();
+                            const userId = user?.id ?? null;
+                            if (!userId) {
+                              console.error('[Patient] End Session: No user ID found');
+                              return;
+                            }
+                            const { error } = await supabase
+                              .from('schedules')
+                              .update({
+                                status: 'pending_end',
+                                end_requested_by: userId,
+                                updated_at: new Date().toISOString()
+                              })
+                              .eq('id', appointmentId);
+                            if (error) {
+                              console.error('[Patient] End Session supabase error:', error);
+                            } else {
+                              setSessionStatus('pending_end');
+                              setSchedule(prev => prev ? { ...prev, end_requested_by: userId } : null);
+                              setDidIRequestEnd(true);
+                            }
+                          }}
+                        >
+                          <CheckCircle2 className="w-4 h-4 mr-2" />
+                          End Session
+                        </DropdownMenuItem>
+                      )}
+                      {(sessionStatus === 'active' || sessionStatus === 'pending_end') && (
+                        <DropdownMenuItem 
+                          className="text-red-400 hover:bg-slate-700 focus:bg-slate-700 hover:text-red-300 focus:text-red-300" 
+                          onClick={() => setShowDisputeDialog(true)}
+                        >
+                          <AlertCircle className="w-4 h-4 mr-2" />
+                          File Dispute
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
             </div>
 
+            {/* Pending End Banner */}
+            <AnimatePresence>
+              {sessionStatus === 'pending_end' && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="bg-slate-900/40 backdrop-blur-md border-b border-slate-800/50 p-4"
+                >
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="bg-blue-500/20 p-2 rounded-full">
+                        <CheckCircle2 className="w-5 h-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <h4 className="text-white font-medium">Session End Requested</h4>
+                        <p className="text-xs text-slate-400">
+                          {didIRequestEnd 
+                            ? "Waiting for the doctor to confirm the end of this session..." 
+                            : "The doctor wants to end this session. Please confirm to conclude."}
+                        </p>
+                      </div>
+                    </div>
+                    {!didIRequestEnd && (
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={async () => {
+                            if (!appointmentId) return;
+                            const { error } = await supabase
+                              .from('schedules')
+                              .update({
+                                status: 'active',
+                                updated_at: new Date().toISOString()
+                              })
+                              .eq('id', appointmentId);
+                            if (!error) setSessionStatus('active');
+                          }}
+                          className="bg-slate-800 border-slate-700 text-slate-300 hover:text-white"
+                        >
+                          Continue Session
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          className="bg-[#004DFF] hover:bg-blue-600 text-white"
+                          onClick={async () => {
+                            if (!appointmentId) return;
+                            const { error } = await supabase
+                              .from('schedules')
+                              .update({
+                                status: 'completed',
+                                ended_at: new Date().toISOString(),
+                                updated_at: new Date().toISOString()
+                              })
+                              .eq('id', appointmentId);
+                            if (!error) {
+                              setSessionStatus('completed');
+                              window.location.href = '/payment';
+                            }
+                          }}
+                        >
+                          Confirm & End
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+              <div className="flex justify-center mb-6 mt-2">
+                <div className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 rounded-full px-4 py-1.5 flex items-center space-x-2 shadow-sm">
+                  <svg className="w-3.5 h-3.5 text-amber-400/80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                  <span className="text-xs font-medium text-slate-400">Messages are end-to-end encrypted. No one outside of this chat, not even Epoch Telehealth, can read them.</span>
+                </div>
+              </div>
+
               <AnimatePresence>
                 {messages.map((msg) => (
                   <motion.div
@@ -1129,11 +1221,11 @@ export default function PatientChatPage() {
                     className={`flex ${msg.sender === "patient" ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className={`max-w-xs sm:max-w-sm lg:max-w-md ${
+                      className={`max-w-xs sm:max-w-sm lg:max-w-md px-4 py-2.5 shadow-md ${
                         msg.sender === "patient"
-                          ? "bg-gradient-to-r from-blue-600 to-green-600 text-white"
-                          : "bg-white dark:bg-gray-700 text-gray-900 dark:text-white border"
-                      } rounded-lg p-3 shadow-sm`}
+                          ? "bubble-sent text-slate-50"
+                          : "bubble-received text-slate-200"
+                      }`}
                     >
                       {msg.type === "file" ? (
                         <div className="flex items-center space-x-2">
@@ -1141,10 +1233,17 @@ export default function PatientChatPage() {
                           <span className="text-sm">{msg.content}</span>
                         </div>
                       ) : (
-                        <p className="text-sm break-words">{msg.content}</p>
+                        <p className="text-sm leading-relaxed break-words">{msg.content}</p>
                       )}
-                      <div className={`text-xs mt-1 ${msg.sender === "patient" ? "text-blue-100" : "text-gray-500"}`}>
+                      <div className={`text-[10px] mt-1.5 flex items-center gap-1 ${
+                        msg.sender === "patient" ? "text-blue-200/60 justify-end" : "text-slate-500 justify-start"
+                      }`}>
                         {msg.timestamp}
+                        {msg.sender === "patient" && (
+                          <svg className="w-3 h-3 text-blue-200/50" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M12.354 4.354a.5.5 0 0 0-.708-.708L5 11.293 1.854 8.146a.5.5 0 1 0-.708.708l3.5 3.5a.5.5 0 0 0 .708 0l7-7zm-4.208 7.208l.708.708 7-7-.708-.708-7 7z"/>
+                          </svg>
+                        )}
                       </div>
                     </div>
                   </motion.div>
@@ -1155,35 +1254,35 @@ export default function PatientChatPage() {
 
             {/* Session Status Banner */}
             {sessionStatus === 'pending_end' && countdown !== null && countdown > 0 && (
-              <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 p-2 text-center">
-                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+              <div className="bg-amber-900/30 backdrop-blur-sm border-b border-amber-700/30 p-2 text-center">
+                <p className="text-sm font-medium text-amber-300">
                   Session ending in {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
                 </p>
               </div>
             )}
 
             {/* Message Input */}
-            <div className="bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 p-4">
+            <div className="bg-slate-900/80 border-t border-slate-800/50 p-4">
               <div className="flex items-end space-x-2">
                 <div className="flex-1">
                   {/* Media Buttons */}
                   <div className="flex items-center space-x-1 mb-2">
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-slate-300 hover:bg-slate-800">
                       <Paperclip className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-slate-300 hover:bg-slate-800">
                       <ImageIcon className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-slate-500 hover:text-slate-300 hover:bg-slate-800">
                       <Smile className="h-4 w-4" />
                     </Button>
                   </div>
 
                   <div>
                     {sessionStatus === 'completed' ? (
-                      <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                      <div className="text-center py-4 text-slate-400">
                         <p>This session has been completed. Messaging is no longer available.</p>
-                        <p className="text-sm mt-1">Please start a new session if you need further assistance.</p>
+                        <p className="text-sm mt-1 text-slate-500">Please start a new session if you need further assistance.</p>
                       </div>
                     ) : (
                       <>
@@ -1200,7 +1299,7 @@ export default function PatientChatPage() {
                               }
                             }}
                             placeholder="Type a message..."
-                            className="min-h-[90px] flex-1 resize-none"
+                            className="min-h-[90px] flex-1 resize-none bg-slate-800/80 border-slate-700/50 text-white placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-[#004DFF]/30"
                             disabled={isRecording}
                           />
                           <div className="flex flex-col space-y-2">
@@ -1208,7 +1307,7 @@ export default function PatientChatPage() {
                               variant="ghost"
                               size="sm"
                               onClick={() => setIsRecording(!isRecording)}
-                              className={isRecording ? "text-red-600" : ""}
+                              className={isRecording ? "text-red-500" : "text-slate-400 hover:text-white hover:bg-slate-800"}
                               disabled={sessionStatus === 'completed'}
                             >
                               {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
@@ -1217,14 +1316,14 @@ export default function PatientChatPage() {
                             <Button
                               onClick={sendMessage}
                               disabled={!message.trim() || sessionStatus === 'completed'}
-                              className="bg-gradient-to-r from-blue-600 to-green-600 hover:from-blue-700 hover:to-green-700 text-white"
+                              className="bg-[#004DFF] hover:bg-blue-600 text-white"
                             >
                               <Send className="w-4 h-4" />
                             </Button>
                           </div>
                         </div>
                         {sessionStatus === 'disputed' && (
-                          <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+                          <p className="text-xs text-amber-400/80 mt-2">
                             ⚠️ This session is under dispute. Please resolve the dispute to continue messaging.
                           </p>
                         )}
@@ -1238,12 +1337,12 @@ export default function PatientChatPage() {
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <div className="w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Users className="w-8 h-8 text-gray-400" />
+              <div className="w-16 h-16 bg-slate-800 border border-slate-700/50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Users className="w-8 h-8 text-slate-500" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Select a doctor</h3>
-              <p className="text-gray-600 dark:text-gray-300">Choose a doctor from the sidebar to start messaging</p>
-              <Button className="mt-4 lg:hidden" onClick={() => setShowSidebar(true)}>
+              <h3 className="text-lg font-semibold text-white mb-2">Select a doctor</h3>
+              <p className="text-slate-400">Choose a doctor from the sidebar to start messaging</p>
+              <Button className="mt-4 lg:hidden bg-[#004DFF] hover:bg-blue-600" onClick={() => setShowSidebar(true)}>
                 <Menu className="w-4 h-4 mr-2" />
                 Open Doctor List
               </Button>

@@ -12,6 +12,7 @@ type UserProfile = Database["public"]["Tables"]["user_profiles"]["Row"] & {
   full_name?: string;
   email?: string;
   wallet_address?: string;
+  user_profile_id?: string;
 };
 
 interface UseUserProfileReturn {
