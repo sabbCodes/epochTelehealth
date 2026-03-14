@@ -24,6 +24,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import { useDoctorProfile } from "@/hooks/useDoctorProfile";
 import { supabase } from "@/lib/supabase";
 import { formatName } from "@/lib/utils";
@@ -48,6 +49,105 @@ interface Appointment {
   status: "confirmed" | "pending" | "completed" | "cancelled" | "scheduled";
   duration: string;
   notes: string;
+}
+
+// ---- Availability Modal (embedded) ----
+
+interface AvailabilityDay { isOpen: boolean; start: string; end: string; }
+type Availability = Record<string, AvailabilityDay>;
+const DAYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+
+function AvailabilityModal({
+  open, onClose, doctorId, currentAvailability, toast,
+}: {
+  open: boolean;
+  onClose: () => void;
+  doctorId: string | undefined;
+  currentAvailability: Availability | null;
+  toast: ReturnType<typeof useToast>["toast"];
+}) {
+  const defaultSlot: AvailabilityDay = { isOpen: false, start: "09:00", end: "17:00" };
+  const [schedule, setSchedule] = useState<Availability>(() => {
+    if (currentAvailability) return currentAvailability;
+    return Object.fromEntries(DAYS.map((d) => [d, { ...defaultSlot }]));
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (currentAvailability) setSchedule(currentAvailability);
+  }, [currentAvailability]);
+
+  function update(day: string, field: keyof AvailabilityDay, value: string | boolean) {
+    setSchedule((prev) => ({ ...prev, [day]: { ...prev[day], [field]: value } }));
+  }
+
+  async function save() {
+    if (!doctorId) return;
+    setSaving(true);
+    const { error } = await supabase
+      .from("doctor_profiles")
+      .update({ availability_schedule: schedule })
+      .eq("id", doctorId);
+    setSaving(false);
+    if (error) {
+      console.error("[AvailabilityModal] save error:", error);
+      toast({ title: "Error", description: "Failed to save availability.", variant: "destructive" });
+    } else {
+      toast({ title: "Availability Updated", description: "Your schedule has been saved." });
+      onClose();
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-700">
+        <DialogHeader>
+          <DialogTitle className="text-slate-900 dark:text-white flex items-center gap-2">
+            <Clock size={18} className="text-[#004DFF] dark:text-blue-400" />
+            Update Availability Schedule
+          </DialogTitle>
+          <DialogDescription className="text-slate-500 dark:text-slate-400">
+            Set your consultation hours for each day of the week.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-2 mt-2">
+          {DAYS.map((day) => (
+            <div key={day} className="flex items-center gap-3 py-2 border-b border-slate-100 dark:border-slate-800 last:border-0">
+              <input
+                type="checkbox"
+                checked={schedule[day]?.isOpen ?? false}
+                onChange={(e) => update(day, "isOpen", e.target.checked)}
+                className="w-4 h-4 rounded accent-[#004DFF]"
+              />
+              <span className={`w-24 capitalize text-sm font-semibold ${
+                schedule[day]?.isOpen ? "text-slate-900 dark:text-white" : "text-slate-400 dark:text-slate-500"
+              }`}>{day}</span>
+              {schedule[day]?.isOpen ? (
+                <div className="flex items-center gap-2 flex-1">
+                  <input type="time" value={schedule[day].start}
+                    onChange={(e) => update(day, "start", e.target.value)}
+                    className="flex-1 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 dark:text-white outline-none focus:ring-2 focus:ring-[#004DFF]/20" />
+                  <span className="text-slate-400 dark:text-slate-500 text-xs font-medium">to</span>
+                  <input type="time" value={schedule[day].end}
+                    onChange={(e) => update(day, "end", e.target.value)}
+                    className="flex-1 text-sm bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg px-2 py-1 dark:text-white outline-none focus:ring-2 focus:ring-[#004DFF]/20" />
+                </div>
+              ) : (
+                <span className="text-xs text-slate-400 dark:text-slate-600 italic">Closed</span>
+              )}
+            </div>
+          ))}
+        </div>
+        <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800 mt-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition">Cancel</button>
+          <button onClick={save} disabled={saving}
+            className="px-5 py-2 bg-[#004DFF] text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition disabled:opacity-60 shadow-lg shadow-blue-200 dark:shadow-none">
+            {saving ? "Saving..." : "Save Schedule"}
+          </button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 // ---- Helpers ----
@@ -227,6 +327,7 @@ export default function DoctorAppointments() {
   const [dateFilter, setDateFilter] = useState("all");
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [rescheduleTarget, setRescheduleTarget] = useState<Appointment | null>(null);
+  const [availabilityOpen, setAvailabilityOpen] = useState(false);
 
   // Fetch appointments
   const fetchAppointments = useCallback(async () => {
@@ -363,7 +464,7 @@ export default function DoctorAppointments() {
             <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm">Manage your schedule and patient consultations.</p>
           </div>
           <button
-            onClick={() => router.push("/schedule")}
+            onClick={() => setAvailabilityOpen(true)}
             className="flex items-center justify-center space-x-2 bg-[#004DFF] text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-blue-200 dark:shadow-blue-900/20 hover:bg-blue-700 transition-all active:scale-95"
           >
             <Plus size={20} /><span>Add Availability</span>
@@ -517,9 +618,6 @@ export default function DoctorAppointments() {
                           <Eye size={16} /> View Notes
                         </button>
                       )}
-                      {/* <button className="p-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition">
-                        <MoreVertical size={18} />
-                      </button> */}
                     </div>
                   </div>
 
@@ -555,6 +653,19 @@ export default function DoctorAppointments() {
           onSent={fetchAppointments}
         />
       )}
+
+      {/* Availability Modal */}
+      <AvailabilityModal
+        open={availabilityOpen}
+        onClose={() => setAvailabilityOpen(false)}
+        doctorId={doctorProfile?.id}
+        currentAvailability={
+          doctorProfile?.availability_schedule
+            ? (doctorProfile.availability_schedule as unknown as Availability)
+            : null
+        }
+        toast={toast}
+      />
     </div>
   );
 }

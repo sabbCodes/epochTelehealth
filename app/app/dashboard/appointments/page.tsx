@@ -299,7 +299,11 @@ export default function PatientAppointments() {
                       <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-slate-400 dark:text-slate-500 font-semibold">
                         <span className="flex items-center gap-1"><Clock size={13} className="text-slate-500" />{apt.time} – {apt.endTime}</span>
                         <span className="flex items-center gap-1"><CalendarIcon size={13} className="text-slate-500" />{apt.date} · {apt.duration}</span>
-                        {apt.type === "Video Consultation" && <span className="flex items-center gap-1"><Video size={13} className="text-slate-500" />Video</span>}
+                        <span className="flex items-center gap-1">
+                          {apt.consultationType === "video" || apt.consultationType === "extended_video"
+                            ? <><Video size={13} className="text-blue-500" />Video</>
+                            : <><MessageCircle size={13} className="text-emerald-500" />Text Chat</>}
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -308,10 +312,10 @@ export default function PatientAppointments() {
                     {(apt.status === "confirmed" || apt.status === "pending") && (
                       <button
                         onClick={() => {
-                          if (apt.consultationType === "chat") {
-                            router.push(`/chat/patient?appointmentId=${apt.id}`);
-                          } else {
+                          if (apt.consultationType === "extended_video" || apt.consultationType === "video") {
                             router.push(`/video-call?appointmentId=${apt.id}&role=patient`);
+                          } else {
+                            router.push(`/chat/patient?appointmentId=${apt.id}`);
                           }
                         }}
                         className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition shadow-sm text-sm ${
@@ -320,7 +324,7 @@ export default function PatientAppointments() {
                             : "bg-emerald-500 text-white hover:bg-emerald-600 shadow-emerald-200 dark:shadow-none"
                         }`}
                       >
-                        {apt.consultationType !== "chat" ? <Video size={16} /> : <MessageCircle size={16} />}
+                        {apt.consultationType === "extended_video" || apt.consultationType === "video" ? <Video size={16} /> : <MessageCircle size={16} />}
                         Join
                       </button>
                     )}
@@ -336,7 +340,7 @@ export default function PatientAppointments() {
                     )}
                     {apt.status === "completed" && (
                       <button
-                        onClick={() => router.push(`/doctors/${apt.doctorId}`)}
+                        onClick={() => router.push(`/schedule?doctorId=${apt.doctorId}`)}
                         className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 px-4 py-2.5 rounded-xl font-bold transition text-sm"
                       >
                         Book again <ChevronRight size={16} />

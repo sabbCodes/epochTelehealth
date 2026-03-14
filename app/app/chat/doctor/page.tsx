@@ -19,8 +19,6 @@ import {
   Stethoscope,
   ImageIcon,
   FileText,
-  Mic,
-  MicOff,
   ArrowLeft,
   Menu,
   Pill,
@@ -50,12 +48,15 @@ export default function DoctorChatPage() {
   const wallet = useWallet()
   const [selectedChat, setSelectedChat] = useState(1)
   const [message, setMessage] = useState("")
-  const [isRecording, setIsRecording] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
   const [showHealthRecord, setShowHealthRecord] = useState(false)
   const [showPrescription, setShowPrescription] = useState(false)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const searchParams = useSearchParams()
+
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
 
   // Chat state from Supabase
   const [appointmentId, setAppointmentId] = useState<string | null>(null)
@@ -78,9 +79,17 @@ export default function DoctorChatPage() {
   } | null>(null)
   const [scheduleNote, setScheduleNote] = useState<string | null>(null)
   const [showEndSessionConfirm, setShowEndSessionConfirm] = useState(false)
-  const [messages, setMessages] = useState<
-    { id: string; sender: "doctor" | "patient"; content: string; timestamp: string; type: "text" | "file" }[]
-  >([])
+  type Message = {
+    id: string
+    sender: "patient" | "doctor"
+    content: string
+    timestamp: string
+    type: "text" | "video" | "voice" | "file"
+    file_url?: string
+    file_type?: string
+    file_name?: string
+  }
+  const [messages, setMessages] = useState<Message[]>([])
   const [sessionStatus, setSessionStatus] = useState<string>('active')
   const [showDisputeBanner, setShowDisputeBanner] = useState(true)
   const [disputeStartTime, setDisputeStartTime] = useState<string | null>(null)
@@ -94,6 +103,9 @@ export default function DoctorChatPage() {
     receiver_id: string
     content: string
     created_at: string
+    file_url?: string
+    file_type?: string
+    file_name?: string
   }
 
   // Type for schedule update payload
@@ -270,7 +282,14 @@ export default function DoctorChatPage() {
     };
 
     fetchSchedule();
-  }, [appointmentId]);
+  }, [appointmentId, doctorUserId]);
+
+  // Show feedback modal when session completes
+  useEffect(() => {
+    if (sessionStatus === 'completed') {
+      setShowFeedbackModal(true)
+    }
+  }, [sessionStatus])
 
   // After schedule, resolve doctor/patient to their user_profile_ids and fetch patient profile for header
   useEffect(() => {
@@ -358,7 +377,7 @@ export default function DoctorChatPage() {
     const loadMessages = async () => {
       const { data, error } = await supabase
         .from("messages")
-        .select("id, appointment_id, sender_id, receiver_id, content, created_at")
+        .select("id, appointment_id, sender_id, receiver_id, content, created_at, file_url, file_type, file_name")
         .eq("appointment_id", appointmentId)
         .order("created_at", { ascending: true })
 
@@ -379,7 +398,10 @@ export default function DoctorChatPage() {
             hour: '2-digit',
             minute: '2-digit',
           }),
-          type: 'text' as const,
+          type: (m.file_url ? 'file' : 'text') as Message['type'],
+          file_url: m.file_url,
+          file_type: m.file_type,
+          file_name: m.file_name,
         };
       });
       
@@ -428,15 +450,18 @@ export default function DoctorChatPage() {
                 (pm) => pm.id.startsWith('temp-') && pm.content === m.content
               )
 
-              const confirmed = {
+              const confirmed: Message = {
                 id: m.id,
-                sender: m.sender_id === doctorUserId ? 'doctor' as const : 'patient' as const,
+                sender: m.sender_id === doctorUserId ? 'doctor' : 'patient',
                 content: m.content,
                 timestamp: new Date(m.created_at).toLocaleTimeString([], {
                   hour: '2-digit',
                   minute: '2-digit',
                 }),
-                type: 'text' as const,
+                type: m.file_url ? 'file' : 'text',
+                file_url: m.file_url,
+                file_type: m.file_type,
+                file_name: m.file_name,
               }
 
               if (tempIndex !== -1) {
@@ -480,31 +505,70 @@ export default function DoctorChatPage() {
   ]
 
 
+  // Helper state for pending file upload
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+
   const sendMessage = async () => {
-    if (!message.trim() || !appointmentId || !authUserId || !doctorUserId || !patientUserId) return
+    // Modify slightly: we can send a message IF there's text OR a pending file
+    if ((!message.trim() && !pendingFile) || !appointmentId || !authUserId || !doctorUserId || !patientUserId) return
+    
+    // 1. Upload file if exists
+    let uploadedUrl = null
+    if (pendingFile) {
+      const fileExt = pendingFile.name.split('.').pop()
+      const fileName = `${appointmentId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('chat_attachments')
+        .upload(fileName, pendingFile)
+        
+      if (uploadError) {
+        console.error("Upload error:", uploadError)
+        toast({ title: "Upload Failed", description: "Could not upload file.", variant: "destructive" })
+        return
+      }
+      
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat_attachments')
+        .getPublicUrl(fileName)
+        
+      uploadedUrl = publicUrl
+    }
+
     const isDoctor = authUserId === doctorUserId
-    const payload = {
+    const payload: any = {
       appointment_id: appointmentId,
       sender_id: authUserId,
       receiver_id: isDoctor ? patientUserId : doctorUserId,
-      content: message.trim(),
+      content: message.trim() || (pendingFile ? "Shared a file" : ""),
     }
+    
+    if (pendingFile && uploadedUrl) {
+      payload.file_url = uploadedUrl
+      payload.file_type = pendingFile.type
+      payload.file_name = pendingFile.name
+    }
+
     // Optimistic UI
     const tempId = `temp-${Date.now()}`
-    const optimistic = {
+    const optimistic: Message = {
       id: tempId,
-      sender: isDoctor ? "doctor" as const : "patient" as const,
+      sender: isDoctor ? "doctor" : "patient",
       content: payload.content,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      type: "text" as const,
+      type: payload.file_url ? "file" : "text",
+      file_url: payload.file_url,
+      file_type: payload.file_type,
+      file_name: payload.file_name,
     }
     setMessages((prev) => [...prev, optimistic])
     setMessage("")
+    setPendingFile(null)
 
     const { data, error } = await supabase
       .from("messages")
       .insert(payload)
-      .select("id, created_at, sender_id")
+      .select("id, created_at, sender_id, content, file_url, file_type, file_name")
       .single()
     if (error) {
       console.error("Failed to send message:", error)
@@ -520,9 +584,12 @@ export default function DoctorChatPage() {
             ? {
                 id: data.id as string,
                 sender: data.sender_id === doctorUserId ? "doctor" : "patient",
-                content: optimistic.content,
+                content: data.content,
                 timestamp: new Date(String(data.created_at)).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-                type: "text",
+                type: data.file_url ? "file" : "text",
+                file_url: (data as any).file_url,
+                file_type: (data as any).file_type,
+                file_name: (data as any).file_name,
               }
             : m
         )
@@ -545,7 +612,10 @@ export default function DoctorChatPage() {
     <div className="h-screen bg-slate-950 flex relative">
       {/* Mobile Overlay */}
       {showSidebar && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden" onClick={() => setShowSidebar(false)} />
+        <div
+          className="fixed inset-y-0 left-72 right-0 bg-black/60 backdrop-blur-sm z-20 lg:hidden"
+          onClick={() => setShowSidebar(false)}
+        />
       )}
 
       {/* Dispute Resolution Banner */}
@@ -712,6 +782,31 @@ export default function DoctorChatPage() {
               }}
             >
               Confirm End Session
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Feedback Dialog */}
+      <AlertDialog open={showFeedbackModal} onOpenChange={setShowFeedbackModal}>
+        <AlertDialogContent className="bg-slate-900 border-slate-700/50">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Session Completed 🎉</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400">
+              The consultation has ended successfully. Would you like to share your experience on X (Twitter)? Your feedback helps us grow!
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700">Maybe Later</AlertDialogCancel>
+            <AlertDialogAction 
+              className="bg-black hover:bg-slate-800 text-white border border-slate-700"
+              onClick={() => {
+                const text = encodeURIComponent("Just completed another successful telehealth consultation on Epoch! 🩺💻 Seamless experience and great patient care. The future of medicine is here. @EpochTelehealth #SolanaDoctor");
+                window.open(`https://twitter.com/intent/tweet?text=${text}`, "_blank");
+              }}
+            >
+              <svg className="w-4 h-4 mr-2 fill-current" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+              Post on X
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -890,17 +985,38 @@ export default function DoctorChatPage() {
                     className={`flex ${msg.sender === "doctor" ? "justify-end" : "justify-start"}`}
                   >
                     <div
-                      className={`max-w-xs sm:max-w-sm lg:max-w-md px-4 py-2.5 shadow-md ${
+                      className={`max-w-[70%] rounded-2xl p-3 ${
                         msg.sender === "doctor"
-                          ? "bubble-sent text-slate-50"
-                          : "bubble-received text-slate-200"
+                          ? "bg-gradient-to-br from-[#004DFF] to-blue-600 text-white rounded-br-none shadow-blue-500/20 shadow-lg"
+                          : "bg-slate-800 text-slate-100 rounded-bl-none shadow-slate-900/50 shadow-md border border-slate-700/50"
                       }`}
                     >
-                      <p className="text-sm leading-relaxed break-words">{msg.content}</p>
-                      <div className={`text-[10px] mt-1.5 flex items-center gap-1 ${
-                        msg.sender === "doctor" ? "text-blue-200/60 justify-end" : "text-slate-500 justify-start"
-                      }`}>
-                        {msg.timestamp}
+                      {msg.file_url ? (
+                        <div className="flex flex-col gap-2">
+                          {msg.file_type?.startsWith('image/') ? (
+                            <a href={msg.file_url} target="_blank" rel="noreferrer" className="block w-full max-w-sm overflow-hidden rounded-xl border border-white/10 relative pb-1">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={msg.file_url} alt="Attachment" className="w-full h-auto object-cover max-h-64 rounded-xl" />
+                            </a>
+                          ) : (
+                            <a href={msg.file_url} target="_blank" rel="noreferrer" className={`flex items-center gap-3 p-3 rounded-xl border transition ${msg.sender === "doctor" ? "bg-white/10 hover:bg-white/20 border-white/20" : "bg-slate-700 hover:bg-slate-600 border-slate-600"}`}>
+                              <FileText className="w-8 h-8 opacity-80" />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold truncate">{msg.file_name || "Document"}</p>
+                                <p className="text-xs opacity-70">PDF File</p>
+                              </div>
+                            </a>
+                          )}
+                          {msg.content && msg.content !== "Shared a file" && <p className="text-[15px] mt-1">{msg.content}</p>}
+                        </div>
+                      ) : (
+                        <p className="text-[15px]">{msg.content}</p>
+                      )}
+                      <div
+                        className={`flex items-center space-x-1 mt-1.5 text-[10px] sm:text-xs font-medium ${
+                          msg.sender === "doctor" ? "text-blue-100" : "text-slate-400"
+                        }`}
+                      >{msg.timestamp}
                         {msg.sender === "doctor" && (
                           <svg className="w-3 h-3 text-blue-200/50" fill="currentColor" viewBox="0 0 16 16">
                             <path d="M12.354 4.354a.5.5 0 0 0-.708-.708L5 11.293 1.854 8.146a.5.5 0 1 0-.708.708l3.5 3.5a.5.5 0 0 0 .708 0l7-7zm-4.208 7.208l.708.708 7-7-.708-.708-7 7z"/>
@@ -918,16 +1034,86 @@ export default function DoctorChatPage() {
             <div className="bg-slate-900/80 border-t border-slate-800/50 p-4">
               <div className="flex items-end space-x-2">
                 <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-300 hover:bg-slate-800">
+                  {/* Action row: file upload, emoji picker */}
+                  <div className="flex items-center space-x-1 mb-2 relative">
+                    {/* Hidden file input */}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif,application/pdf"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 1024 * 1024) {
+                          toast({ title: "File too large", description: "Please upload a file smaller than 1MB.", variant: "destructive" });
+                          e.target.value = "";
+                          return;
+                        }
+                        const allowed = ["image/png","image/jpeg","image/webp","image/gif","application/pdf"];
+                        if (!allowed.includes(file.type)) {
+                          toast({ title: "Unsupported file", description: "Only images (PNG, JPG, GIF, WebP) and PDFs are allowed.", variant: "destructive" });
+                          e.target.value = "";
+                          return;
+                        }
+                        // Stage file to be sent via sendMessage
+                        setPendingFile(file);
+                        e.target.value = "";
+                      }}
+                    />
+                    <Button
+                      variant="ghost" size="sm"
+                      className="text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+                      onClick={() => fileInputRef.current?.click()}
+                      title="Attach image or PDF (max 1MB)"
+                    >
                       <Paperclip className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="hidden sm:flex text-slate-500 hover:text-slate-300 hover:bg-slate-800">
+                    <Button
+                      variant="ghost" size="sm"
+                      className="hidden sm:flex text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+                      onClick={() => { fileInputRef.current?.click(); }}
+                      title="Share image or PDF (max 1MB)"
+                    >
                       <ImageIcon className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="hidden sm:flex text-slate-500 hover:text-slate-300 hover:bg-slate-800">
+                    <Button
+                      variant="ghost" size="sm"
+                      className="hidden sm:flex text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+                      onClick={() => setShowEmojiPicker((p) => !p)}
+                    >
                       <Smile className="w-4 h-4" />
                     </Button>
+
+                    {pendingFile && (
+                      <div className="absolute -top-12 left-0 bg-slate-800 border border-slate-700 rounded-lg p-2 shadow-lg flex items-center gap-2 text-sm text-slate-200">
+                        {pendingFile.type.startsWith('image/') ? <ImageIcon className="w-4 h-4 text-blue-400" /> : <FileText className="w-4 h-4 text-emerald-400" />}
+                        <span className="truncate max-w-[120px]">{pendingFile.name}</span>
+                        <button onClick={() => setPendingFile(null)} className="text-slate-400 hover:text-rose-400 ml-1">
+                          &times;
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Emoji picker */}
+                    {showEmojiPicker && (
+                      <div className="absolute bottom-10 left-0 z-50 bg-slate-800 border border-slate-700 rounded-2xl p-3 shadow-2xl w-72">
+                        <div className="grid grid-cols-8 gap-1 max-h-52 overflow-y-auto custom-scrollbar">
+                          {["😊","😂","🤣","❤️","😍","🙏","😭","😘","👍","😅","🔥","🎉","✅","💯","🥺","👀","😎","🤔","💪","🌟","😷","🩺","💊","🏥","🧬","🩻","🤒","💉","🧘","😴","🤗","👋","🙌","👏","✌️","🫶","💙","🟢","⭐","🎗️"].map((em) => (
+                            <button
+                              key={em}
+                              className="text-xl p-1 rounded hover:bg-slate-700 transition"
+                              onClick={() => {
+                                setMessage((prev) => prev + em);
+                                setShowEmojiPicker(false);
+                              }}
+                            >
+                              {em}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {sessionStatus === 'completed' ? (
@@ -938,43 +1124,33 @@ export default function DoctorChatPage() {
                   ) : (
                     <div className="border-t border-slate-800/50 pt-3">
                       <div className="flex items-center space-x-2">
-                        <Textarea
-                          value={message}
-                          onChange={(e) => setMessage(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              if (message.trim() && sessionStatus !== 'disputed') {
-                                sendMessage();
+                          <Textarea
+                            value={message}
+                            onChange={(e) => setMessage(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                if ((message.trim() || pendingFile) && sessionStatus !== 'disputed') {
+                                  sendMessage();
+                                }
                               }
-                            }
-                          }}
-                          placeholder={sessionStatus === 'disputed' 
-                            ? 'This session is under dispute. Please wait for resolution...' 
-                            : 'Type your message...'}
-                          className="min-h-[90px] flex-1 resize-none bg-slate-800/80 border-slate-700/50 text-white placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-[#004DFF]/30"
-                          disabled={isRecording || sessionStatus === 'disputed'}
-                        />
-                        <div className="flex flex-col space-y-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setIsRecording(!isRecording)}
-                            className={isRecording ? "text-red-500" : "text-slate-400 hover:text-white hover:bg-slate-800"}
-                            disabled={sessionStatus === 'disputed' || sessionStatus === 'completed'}
-                          >
-                            {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                          </Button>
-
-                          <Button
-                            onClick={sendMessage}
-                            disabled={!message.trim() || sessionStatus === 'disputed' || sessionStatus === 'completed'}
-                            className="bg-[#004DFF] hover:bg-blue-600 text-white"
-                          >
-                            <Send className="w-4 h-4" />
-                          </Button>
+                            }}
+                            placeholder={sessionStatus === 'disputed'
+                              ? 'This session is under dispute. Please wait for resolution...'
+                              : pendingFile ? 'Add a caption...' : 'Type your message...'}
+                            className="min-h-[90px] flex-1 resize-none bg-slate-800/80 border-slate-700/50 text-white placeholder:text-slate-500 rounded-xl focus:ring-2 focus:ring-[#004DFF]/30"
+                            disabled={sessionStatus === 'disputed'}
+                          />
+                          <div className="flex flex-col space-y-2">
+                            <Button
+                              onClick={sendMessage}
+                              disabled={(!message.trim() && !pendingFile) || sessionStatus === 'disputed' || sessionStatus === 'completed'}
+                              className="bg-[#004DFF] hover:bg-blue-600 text-white"
+                            >
+                              <Send className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
-                      </div>
                       {sessionStatus === 'disputed' && (
                         <p className="text-xs text-amber-400/80 mt-2">
                           ⚠️ This session is under dispute. Please wait for the patient or support to resolve the issue.
