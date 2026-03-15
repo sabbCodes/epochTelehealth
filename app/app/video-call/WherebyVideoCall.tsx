@@ -178,7 +178,7 @@ export function WherebyVideoCall({
             initial={{ width: 0, opacity: 0 }}
             animate={{ width: 340, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
-            className="h-full border-r border-slate-800 bg-slate-900/50 backdrop-blur-md flex flex-col z-20"
+            className="absolute left-0 top-0 bottom-0 md:relative h-full border-r border-slate-800 bg-slate-900/95 md:bg-slate-900/50 backdrop-blur-xl flex flex-col z-40 shadow-2xl md:shadow-none"
           >
             <div className="p-6 flex flex-col h-full">
               <div className="flex items-center justify-between mb-8">
@@ -264,7 +264,7 @@ export function WherebyVideoCall({
               <div className="w-px h-4 bg-slate-700" />
               <span className="text-xs text-slate-400 flex items-center gap-1">
                 <ShieldCheck size={14} className="text-blue-500" />
-                Secure P2P
+                <span className="hidden sm:inline">Secure P2P</span>
               </span>
             </div>
           </div>
@@ -273,9 +273,9 @@ export function WherebyVideoCall({
             <button className="p-2.5 bg-slate-900/80 backdrop-blur-md border border-slate-700 rounded-xl hover:bg-slate-800 transition-colors">
               <Settings size={20} />
             </button>
-            <div className="px-4 py-2.5 bg-slate-900/80 backdrop-blur-md border border-slate-700 rounded-xl flex items-center gap-3">
+            <div className="px-3 sm:px-4 py-2.5 bg-slate-900/80 backdrop-blur-md border border-slate-700 rounded-xl flex items-center sm:gap-3">
               <img src="/telehealthlogo.svg" alt="Epoch Telehealth" className="h-6 w-auto" />
-              <span className="text-sm font-bold tracking-tight">Epoch <span className="text-blue-500">Telehealth</span></span>
+              <span className="hidden sm:inline text-sm font-bold tracking-tight">Epoch <span className="text-blue-500">Telehealth</span></span>
             </div>
           </div>
         </div>
@@ -316,14 +316,6 @@ export function WherebyVideoCall({
                     </div>
                  </div>
 
-                 {/* Side Area: Stacked Participants (Remote + Local) */}
-                 {/* Reduced contrast: bg-slate-950 -> bg-[#0f172a] (slate-900) but slightly different or reliance on main bg being darker/lighter? 
-                     User said: "change in background color ... is too high, make it just slightly different".
-                     Current main: bg-slate-900. Side: bg-slate-950.
-                     Let's make side bg-slate-925 (custom hex closer to 900). 
-                     Slate 900: #0f172a. Slate 950: #020617. 
-                     Let's use #0b1121.
-                 */}
                  <div className="flex-1 flex flex-row md:flex-col items-center justify-center gap-4 p-4 min-h-[200px] md:min-h-0 bg-[#0b1121]">
                     
                     {/* Remote Participant */}
@@ -461,7 +453,7 @@ export function WherebyVideoCall({
             initial={{ x: 400 }}
             animate={{ x: 0 }}
             exit={{ x: 400 }}
-            className="h-full w-80 sm:w-96 border-l border-slate-800 bg-slate-900/80 backdrop-blur-lg flex flex-col z-30"
+            className="absolute right-0 top-0 bottom-0 md:relative h-full w-80 sm:w-96 border-l border-slate-800 bg-slate-900/95 md:bg-slate-900/80 backdrop-blur-xl flex flex-col z-40 shadow-2xl md:shadow-none"
           >
             <div className="p-6 border-b border-slate-800 flex items-center justify-between bg-slate-900">
               <h2 className="font-bold">Consultation Chat</h2>
