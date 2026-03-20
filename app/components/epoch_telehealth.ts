@@ -5,7 +5,7 @@
  * IDL can be found at `target/idl/epoch_telehealth.json`.
  */
 export type EpochTelehealth = {
-  "address": "2MaYTbWLqs8nqLNPPrTz4KXkbhMt4hQKQaM3LVFQNnPG",
+  "address": "3ysVkEtwyspGSyx5Emr1HGws9rA7upNe7uhMVKmoQenj",
   "metadata": {
     "name": "epochTelehealth",
     "version": "0.1.0",

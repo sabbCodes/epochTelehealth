@@ -68,7 +68,6 @@ const getPrivateKey = (): Uint8Array => {
     }
   }
 
-  console.log("✅ Using fixed private key from environment");
   return privateKey;
 };
 
@@ -236,12 +235,9 @@ export function HealthRecordForm({
         Buffer.from(mxePublicKey).toString("hex")
       );
 
-      // Generate encryption keys
-      const privateKey = x25519.utils.randomSecretKey();
+      // Generate encryption keys using our fixed environment private key
+      const privateKey = getPrivateKey();
       const publicKey = x25519.getPublicKey(privateKey);
-
-      const privateKeyHex = Buffer.from(privateKey).toString('hex');
-      console.log('NEXT_PUBLIC_ENCRYPTION_PRIVATE_KEY=' + privateKeyHex);
 
       if (!publicKey) {
         throw new Error("Failed to generate public key");
@@ -401,7 +397,14 @@ export function HealthRecordForm({
           <div>
             <p>Health record encrypted and stored on-chain successfully.</p>
             <p className="text-xs mt-1">Record ID: {recordUUID}</p>
-            <p className="text-xs break-all">Tx: {signature}</p>
+            <a 
+              href={`https://explorer.solana.com/tx/${signature}?cluster=devnet`} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-xs text-[#004DFF] hover:underline block mt-1"
+            >
+              View on Solana Explorer
+            </a>
           </div>
         ),
       });
@@ -586,7 +589,7 @@ export function HealthRecordForm({
           ) : (
             <>
               <Save className="w-4 h-4 mr-2" />
-              Save Record On-Chain
+              Save Record
             </>
           )}
         </Button>

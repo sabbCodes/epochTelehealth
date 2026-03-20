@@ -42,6 +42,60 @@ import { Dialog, DialogContent } from "@/components/ui/dialog"
 import { HealthRecordForm } from "@/components/health-record-form"
 import { PrescriptionForm } from "@/components/prescription-form"
 import { supabase } from "@/lib/supabase"
+import { AnchorProvider, Program } from "@coral-xyz/anchor"
+import { useConnection } from "@solana/wallet-adapter-react"
+import { PublicKey } from "@solana/web3.js"
+import { RescueCipher, x25519, getMXEPublicKey } from "@arcium-hq/client"
+import idl from "@/components/epoch_telehealth.json"
+import { EpochTelehealth } from "@/components/epoch_telehealth"
+import { RefreshCw, ChevronDown, ExternalLink } from "lucide-react"
+
+const idl_string = JSON.stringify(idl);
+const idl_object = JSON.parse(idl_string);
+const programID = new PublicKey((idl as any).address);
+
+const getNonce = (): Uint8Array => {
+  const envNonce = process.env.NEXT_PUBLIC_ENCRYPTION_NONCE;
+  const hex = envNonce?.startsWith('0x') ? envNonce.slice(2) : envNonce;
+  const nonce = new Uint8Array(16);
+  if (hex?.length === 32) {
+    for (let i = 0; i < 32; i += 2) nonce[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+  }
+  return nonce;
+};
+
+const getPrivateKey = (): Uint8Array => {
+  const envKey = process.env.NEXT_PUBLIC_ENCRYPTION_PRIVATE_KEY;
+  const hex = envKey?.startsWith('0x') ? envKey.slice(2) : envKey;
+  const key = new Uint8Array(32);
+  if (hex?.length === 64) {
+    for (let i = 0; i < 64; i += 2) key[i / 2] = parseInt(hex.substring(i, i + 2), 16);
+  }
+  return key;
+};
+
+const u64ArrayToString = (arr: bigint[]): string => {
+  const bytes: number[] = [];
+  for (const val of arr) {
+    for (let j = 0; j < 8; j++) {
+      const b = Number((val >> BigInt(j * 8)) & BigInt(0xff));
+      if (b !== 0) bytes.push(b);
+    }
+  }
+  return new TextDecoder().decode(new Uint8Array(bytes));
+};
+
+const u128ToString = (val: bigint): string => {
+  const bytes: number[] = [];
+  for (let i = 0; i < 16; i++) {
+    const b = Number((val >> BigInt(i * 8)) & BigInt(0xff));
+    if (b !== 0) bytes.push(b);
+  }
+  return new TextDecoder().decode(new Uint8Array(bytes));
+};
+
+const isReadable = (s: string) => s.length > 0 && !/[\x00-\x08\x0E-\x1F\x7F]/.test(s);
+
 
 export default function DoctorChatPage() {
   const { toast } = useToast()
@@ -52,6 +106,103 @@ export default function DoctorChatPage() {
   const [showHealthRecord, setShowHealthRecord] = useState(false)
   const [showPrescription, setShowPrescription] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  
+  // Fetch Records State
+  const { connection } = useConnection()
+  type HealthRecord = {
+    id: number;
+    title: string;
+    date: string;
+    diagnosis: string;
+    symptoms: string;
+    treatment: string;
+    medications: string;
+    notes: string;
+    blockchainTx: string;
+  };
+  const [provider, setProvider] = useState<AnchorProvider | null>(null)
+  const [healthRecords, setHealthRecords] = useState<HealthRecord[]>([])
+  const [isFetchingRecords, setIsFetchingRecords] = useState(false)
+  const [showFetchedRecords, setShowFetchedRecords] = useState(false)
+  const [expandedRecord, setExpandedRecord] = useState<number | null>(null)
+
+  const handleFetchRecords = async () => {
+    if (!wallet.publicKey || !wallet.signTransaction) {
+      toast({ title: "Wallet required", description: "Please connect your wallet to fetch records.", variant: "destructive" });
+      return;
+    }
+    setIsFetchingRecords(true);
+    setHealthRecords([]);
+    setShowFetchedRecords(true);
+    try {
+      const anchorProvider = new AnchorProvider(connection, wallet as any, AnchorProvider.defaultOptions());
+      setProvider(anchorProvider);
+      const program = new Program<EpochTelehealth>(idl_object, anchorProvider);
+      const mxePublicKey = await getMXEPublicKey(anchorProvider, programID);
+      if (!mxePublicKey) throw new Error("Failed to get MXE public key");
+      const sharedSecret = x25519.getSharedSecret(getPrivateKey(), mxePublicKey);
+      const cipher = new RescueCipher(sharedSecret);
+      const nonce = getNonce();
+      const allRecords = await program.account.healthRecord.all();
+      const results: HealthRecord[] = [];
+      const patientProfileId = schedule?.patient_id;
+      for (const record of allRecords) {
+        try {
+          const encData = [
+            Array.from(new Uint8Array(record.account.patientId)),
+            Array.from(new Uint8Array(record.account.doctorId)),
+            Array.from(new Uint8Array(record.account.consultationDate)),
+            Array.from(new Uint8Array(record.account.diagnosis[0])),
+            Array.from(new Uint8Array(record.account.diagnosis[1])),
+            Array.from(new Uint8Array(record.account.diagnosis[2])),
+            Array.from(new Uint8Array(record.account.symptoms[0])),
+            Array.from(new Uint8Array(record.account.symptoms[1])),
+            Array.from(new Uint8Array(record.account.symptoms[2])),
+            Array.from(new Uint8Array(record.account.symptoms[3])),
+            Array.from(new Uint8Array(record.account.symptoms[4])),
+            Array.from(new Uint8Array(record.account.treatmentPlan)),
+            Array.from(new Uint8Array(record.account.medications[0])),
+            Array.from(new Uint8Array(record.account.medications[1])),
+            Array.from(new Uint8Array(record.account.medications[2])),
+            Array.from(new Uint8Array(record.account.medications[3])),
+            Array.from(new Uint8Array(record.account.medications[4])),
+            Array.from(new Uint8Array(record.account.notes)),
+          ];
+          const dec = cipher.decrypt(encData, nonce);
+          const patientId = u128ToString(dec[0]);
+          // if (!patientProfileId || !patientId || !patientProfileId.startsWith(patientId.slice(0, 8))) continue;
+          
+          const dateRaw = u128ToString(dec[2]);
+          const parsedDate = new Date(dateRaw);
+          const displayDate = isNaN(parsedDate.getTime()) ? new Date().toISOString().split('T')[0] : parsedDate.toISOString().split('T')[0];
+          const diagnosis = u64ArrayToString([dec[3], dec[4], dec[5]]);
+          const symptoms = u64ArrayToString([dec[6], dec[7], dec[8], dec[9], dec[10]]);
+          const treatment = u128ToString(dec[11]);
+          const medications = u64ArrayToString([dec[12], dec[13], dec[14], dec[15], dec[16]]);
+          const notes = u128ToString(dec[17]);
+          
+          results.push({
+            id: results.length + 1,
+            title: `Record — ${displayDate}`,
+            date: displayDate,
+            diagnosis: diagnosis || 'Encrypted',
+            symptoms: symptoms || 'Encrypted',
+            treatment: treatment || 'Encrypted',
+            medications: medications || 'Encrypted',
+            notes: notes || 'Encrypted',
+            blockchainTx: record.publicKey.toString(),
+          });
+        } catch { /* skip */ }
+      }
+      setHealthRecords(results);
+      if (results.length === 0) toast({ title: "No records found", description: "No health records found for this patient on-chain." });
+    } catch (err: any) {
+      toast({ title: "Failed to fetch records", description: err.message || "Unknown error", variant: "destructive" });
+    } finally {
+      setIsFetchingRecords(false);
+    }
+  };
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const searchParams = useSearchParams()
@@ -258,30 +409,33 @@ export default function DoctorChatPage() {
 
       setSchedule(data);
       setSessionStatus(data.status || 'active');
-      
-      // Set up real-time subscription for status changes
-      const channel = supabase
-        .channel('schema-db-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'schedules',
-            filter: `id=eq.${appointmentId}`
-          },
-          (payload) => {
-            setSessionStatus(payload.new.status);
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
     };
 
     fetchSchedule();
+
+    // Set up real-time subscription for schedule status changes.
+    // IMPORTANT: use a unique channel name per appointment so that when both
+    // doctor and patient pages are open simultaneously they don't collide and
+    // cause Supabase to deduplicate them into one shared channel.
+    const scheduleChannel = supabase
+      .channel(`doctor-schedule-status-${appointmentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'schedules',
+          filter: `id=eq.${appointmentId}`
+        },
+        (payload) => {
+          setSessionStatus(payload.new.status);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(scheduleChannel);
+    };
   }, [appointmentId, doctorUserId]);
 
   // Show feedback modal when session completes
@@ -876,6 +1030,13 @@ export default function DoctorChatPage() {
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         className="text-slate-200 hover:bg-slate-700 focus:bg-slate-700"
+                        onClick={handleFetchRecords}
+                      >
+                        <RefreshCw className={`w-4 h-4 mr-2 text-blue-400 ${isFetchingRecords ? 'animate-spin' : ''}`} />
+                        Fetch Records
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-slate-200 hover:bg-slate-700 focus:bg-slate-700"
                         onClick={() => setShowPrescription(true)}
                       >
                         <Pill className="w-4 h-4 mr-2 text-emerald-400" />
@@ -1208,14 +1369,83 @@ export default function DoctorChatPage() {
               patientId={schedule.patient_id}
               doctorId={schedule.doctor_id}
               appointmentId={appointmentId || ''}
-              onSave={() => {
-                setShowPrescription(false)
-              }}
-              onCancel={() => setShowPrescription(false)}
             />
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Fetch Records Dialog */}
+      <Dialog open={showFetchedRecords} onOpenChange={setShowFetchedRecords}>
+        <DialogContent className="max-w-2xl bg-slate-900 border-slate-800 text-slate-200 max-h-[85vh] overflow-y-auto custom-scrollbar rounded-2xl">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+              <h2 className="text-xl font-bold">Patient Health Records</h2>
+              <Badge variant="outline" className="border-blue-500/30 text-blue-400 bg-blue-500/10">
+                {healthRecords.length} Records Found
+              </Badge>
+            </div>
+            
+            {isFetchingRecords ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <RefreshCw className="w-8 h-8 text-blue-500 animate-spin mb-4" />
+                <p className="text-slate-400">Decrypting on-chain records...</p>
+              </div>
+            ) : healthRecords.length === 0 ? (
+              <div className="text-center py-12">
+                <FileText className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-slate-300">No Records Found</h3>
+                <p className="text-slate-500 mt-1">This patient has no on-chain medical history.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {healthRecords.map((rec) => (
+                  <div key={rec.id} className="bg-slate-800/50 border border-slate-700/50 rounded-xl overflow-hidden">
+                    <button
+                      onClick={() => setExpandedRecord(expandedRecord === rec.id ? null : rec.id)}
+                      className="w-full flex items-center justify-between p-4 text-left hover:bg-slate-700/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="bg-blue-500/20 p-2 rounded-lg">
+                          <FileText className="w-5 h-5 text-blue-400" />
+                        </div>
+                        <div>
+                          <span className="font-semibold text-slate-200 block">{rec.title}</span>
+                          <span className="text-xs text-slate-400">Consultation Date: {rec.date}</span>
+                        </div>
+                      </div>
+                      <ChevronDown size={18} className={`text-slate-400 transition-transform ${expandedRecord === rec.id ? 'rotate-180' : ''}`} />
+                    </button>
+                    <AnimatePresence>
+                      {expandedRecord === rec.id && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="p-4 border-t border-slate-700/50 space-y-4 bg-slate-800/20 text-sm">
+                            <div><strong className="text-slate-300">Diagnosis:</strong> <span className="text-slate-400">{rec.diagnosis}</span></div>
+                            <div><strong className="text-slate-300">Symptoms:</strong> <span className="text-slate-400">{rec.symptoms}</span></div>
+                            <div><strong className="text-slate-300">Treatment Plan:</strong> <span className="text-slate-400">{rec.treatment}</span></div>
+                            <div><strong className="text-slate-300">Medications:</strong> <span className="text-slate-400">{rec.medications}</span></div>
+                            <div><strong className="text-slate-300">Notes:</strong> <span className="text-slate-400">{rec.notes}</span></div>
+                            <div className="pt-2">
+                              <a href={`https://explorer.solana.com/address/${rec.blockchainTx}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                                <ExternalLink size={12} />
+                                View on Solana Explorer
+                              </a>
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

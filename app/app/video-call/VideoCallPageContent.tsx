@@ -17,6 +17,7 @@ export default function VideoCallPageContent() {
   const [roomUrl, setRoomUrl] = useState<string>("");
   const [localUser, setLocalUser] = useState<any>(null);
   const [remoteUser, setRemoteUser] = useState<any>(null);
+  const [patientProfileId, setPatientProfileId] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   const { userProfile: currentUser } = useUserProfile();
@@ -42,6 +43,10 @@ export default function VideoCallPageContent() {
           const remoteUserRole = roleParam === "doctor" ? "patient" : "doctor";
           remoteUserData = await fetchUserDetails(remoteUserId, remoteUserRole);
           setRemoteUser(remoteUserData);
+          // When the current user is a doctor, remoteUserId is the patient_profiles.id
+          if (roleParam === "doctor") {
+            setPatientProfileId(remoteUserId);
+          }
         }
 
         // 2. Read room URL from schedule (do NOT create a room here)
@@ -190,6 +195,8 @@ export default function VideoCallPageContent() {
       localUser={localUser}
       remoteUser={remoteUser}
       role={roleParam}
+      appointmentId={appointmentId}
+      patientProfileId={patientProfileId}
     />
   );
 }

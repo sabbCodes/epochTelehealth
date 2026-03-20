@@ -542,6 +542,7 @@ export default function DoctorDashboard() {
           <AlertCircle className="w-12 h-12 mx-auto text-red-500 mb-4" />
           <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Error Loading Dashboard</h2>
           <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-6">{error || "An error occurred. Please try again later."}</p>
+          <p className="text-slate-500 dark:text-slate-400 dark:text-slate-500 mb-6">Might be helpful to check your internet connection.</p>
           <button
             onClick={() => router.push("/signin")}
             className="px-6 py-2 bg-[#004DFF] text-white rounded-xl font-bold hover:bg-blue-700 transition"

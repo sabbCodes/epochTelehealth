@@ -56,7 +56,8 @@ export const VideoParticipant: React.FC<VideoParticipantProps> = ({
           >
             <VideoView 
               stream={stream} 
-              mirror={isLocal} 
+              mirror={isLocal}
+              muted={isLocal}
               className="w-full h-full object-cover" 
             />
           </motion.div>

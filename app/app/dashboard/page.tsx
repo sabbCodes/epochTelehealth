@@ -197,6 +197,9 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("Dashboard");
   const [searchQuery, setSearchQuery] = useState("");
   const [chartData, setChartData] = useState<{ day: string; consultations: number }[]>([]);
+  const [totalConsultations, setTotalConsultations] = useState<number | null>(null);
+  const [activeMedications, setActiveMedications] = useState<number | null>(null);
+  const [hasSessionHistory, setHasSessionHistory] = useState<boolean>(false);
   const { toast } = useToast();
   const router = useRouter();
 
@@ -325,6 +328,40 @@ export default function Dashboard() {
     if (isAuthenticated) fetchAppointments();
   }, [userProfile?.id, isAuthenticated]);
 
+  // Fetch real stats: total consultations, active medications, and all-time session history
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!userProfile?.id) return;
+      try {
+        const [{ count: consultCount }, { count: medCount }, { count: historyCount }] = await Promise.all([
+          // Total completed consultations
+          supabase
+            .from("schedules")
+            .select("*", { count: "exact", head: true })
+            .eq("patient_id", userProfile.id)
+            .eq("status", "completed"),
+          // Active prescriptions
+          supabase
+            .from("prescriptions")
+            .select("*", { count: "exact", head: true })
+            .eq("patient_id", userProfile.id)
+            .eq("status", "active"),
+          // Any schedule ever (for first vs next CTA)
+          supabase
+            .from("schedules")
+            .select("*", { count: "exact", head: true })
+            .eq("patient_id", userProfile.id),
+        ]);
+        setTotalConsultations(consultCount ?? 0);
+        setActiveMedications(medCount ?? 0);
+        setHasSessionHistory((historyCount ?? 0) > 0);
+      } catch {
+        // leave defaults (null / false)
+      }
+    };
+    if (isAuthenticated) fetchStats();
+  }, [userProfile?.id, isAuthenticated]);
+
   // Fetch chart data — consultations per day over the last 7 days
   useEffect(() => {
     const fetchChartData = async () => {
@@ -443,14 +480,14 @@ export default function Dashboard() {
     },
     {
       label: "Consultations",
-      value: "12",
+      value: totalConsultations === null ? "..." : totalConsultations.toString(),
       change: "Total consultations",
       icon: Activity,
       color: "bg-violet-500",
     },
     {
       label: "Active Medications",
-      value: "3",
+      value: activeMedications === null ? "..." : activeMedications.toString(),
       change: "Current prescriptions",
       icon: Pill,
       color: "bg-amber-500",
@@ -754,9 +791,9 @@ export default function Dashboard() {
                   ) : (
                     <div className="text-center py-12">
                       <Calendar className="w-10 h-10 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
-                      <p className="text-slate-500 dark:text-slate-400 text-sm">No appointments scheduled yet.</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">No upcoming appointments.</p>
                       <Link href="/doctors" className="mt-4 text-[#004DFF] text-sm font-bold hover:underline inline-block">
-                        + Book your first appointment
+                        + Book your {hasSessionHistory ? "next" : "first"} appointment
                       </Link>
                     </div>
                   )}

@@ -189,54 +189,55 @@ export default function PatientChatPage() {
           return () => clearInterval(timer);
         }
       }
-      
-      // Set up real-time subscription for status changes
-      const channel = supabase
-        .channel('schema-db-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: 'UPDATE',
-            schema: 'public',
-            table: 'schedules',
-            filter: `id=eq.${appointmentId}`
-          },
-          (payload) => {
-            const newStatus = payload.new.status;
-            setSessionStatus(newStatus);
-            
-            // Update local schedule state with the new end_requested_by
-            setSchedule(prev => prev ? { ...prev, end_requested_by: payload.new.end_requested_by as string | null } : null);
-            
-            // If the session is no longer pending_end, reset the local flag
-            if (newStatus !== 'pending_end') setDidIRequestEnd(false);
-            
-            // If status changed to pending_end, start countdown
-            if (newStatus === 'pending_end') {
-              setCountdown(600); // 10 minutes in seconds
-              
-              const timer = setInterval(() => {
-                setCountdown(prev => {
-                  if (prev === null || prev <= 1) {
-                    clearInterval(timer);
-                    return 0;
-                  }
-                  return prev - 1;
-                });
-              }, 1000);
-              
-              return () => clearInterval(timer);
-            }
-          }
-        )
-        .subscribe();
-
-      return () => {
-        supabase.removeChannel(channel);
-      };
     };
 
     fetchSchedule();
+
+    // Set up real-time subscription for schedule status changes.
+    // IMPORTANT: use a unique channel name per appointment so that when both
+    // doctor and patient pages are open simultaneously they don't collide and
+    // cause Supabase to deduplicate them into one shared channel.
+    const scheduleChannel = supabase
+      .channel(`patient-schedule-status-${appointmentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'schedules',
+          filter: `id=eq.${appointmentId}`
+        },
+        (payload) => {
+          const newStatus = payload.new.status;
+          setSessionStatus(newStatus);
+          
+          // Update local schedule state with the new end_requested_by
+          setSchedule(prev => prev ? { ...prev, end_requested_by: payload.new.end_requested_by as string | null } : null);
+          
+          // If the session is no longer pending_end, reset the local flag
+          if (newStatus !== 'pending_end') setDidIRequestEnd(false);
+          
+          // If status changed to pending_end, start countdown
+          if (newStatus === 'pending_end') {
+            setCountdown(600); // 10 minutes in seconds
+            
+            const timer = setInterval(() => {
+              setCountdown(prev => {
+                if (prev === null || prev <= 1) {
+                  clearInterval(timer);
+                  return 0;
+                }
+                return prev - 1;
+              });
+            }, 1000);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(scheduleChannel);
+    };
   }, [appointmentId]);
 
   // After schedule, resolve doctor/patient to their user_profile_ids and fetch patient's doctors
