@@ -60,78 +60,13 @@ export default function SignInPage() {
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotSent, setForgotSent] = useState(false);
   const [forgotLoading, setForgotLoading] = useState(false);
+  // True while waiting for the Google OAuth exchange to complete
+  const [isOAuthLoading, setIsOAuthLoading] = useState(false);
 
   // Password visibility
   const [showPassword, setShowPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
-  // Check for auth callback
-  useEffect(() => {
-    let unsubscribe: { data: { subscription: { unsubscribe: () => void } } } | null = null;
-
-    const handleAuthAndRedirect = async () => {
-      // Check if user email is verified
-      const { isVerified } = await AuthService.checkEmailVerification();
-
-      if (!isVerified) {
-        toast({
-          title: "Email not verified",
-          description:
-            "Please check your email and click the verification link before signing in.",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      // User is authenticated and verified, check if they have a profile
-      const { user: authUser } = await AuthService.getCurrentUser();
-
-      if (authUser?.user_type) {
-        // User has a profile, redirect to dashboard
-        const dashboardRoute = getDashboardRoute(authUser.user_type);
-        router.push(dashboardRoute);
-      } else {
-        // User needs to complete onboarding
-        router.push(
-          `/account-type-selection?email=${encodeURIComponent(
-            authUser?.email || ""
-          )}`
-        );
-      }
-    };
-
-    const init = async () => {
-      const { supabase } = await import("@/lib/supabase");
-
-      // Check current session (Supabase may have already exchanged the OAuth code and removed params from URL)
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (session) {
-        await handleAuthAndRedirect();
-      }
-
-      // Also listen for auth state changes to catch OAuth sign-in completion
-      unsubscribe = supabase.auth.onAuthStateChange(async (event) => {
-        if (event === "SIGNED_IN") {
-          await handleAuthAndRedirect();
-        }
-      }) as unknown as { data: { subscription: { unsubscribe: () => void } } };
-    };
-
-    init();
-
-    return () => {
-      try {
-        unsubscribe?.data.subscription.unsubscribe();
-      } catch (e) {
-        // ignore
-        console.error("Failed to unsubscribe from auth state changes:", e);
-      }
-    };
-  }, [router, toast]);
 
   const getDashboardRoute = (userType: string) => {
     switch (userType) {
@@ -145,6 +80,115 @@ export default function SignInPage() {
         return "/dashboard";
     }
   };
+
+  const handleAuthAndRedirect = async () => {
+    const { isVerified } = await AuthService.checkEmailVerification();
+
+    if (!isVerified) {
+      setIsOAuthLoading(false);
+      toast({
+        title: "Email not verified",
+        description:
+          "Please check your email and click the verification link before signing in.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { user: authUser } = await AuthService.getCurrentUser();
+
+    if (authUser?.user_type) {
+      const dashboardRoute = getDashboardRoute(authUser.user_type);
+      router.push(dashboardRoute);
+    } else {
+      router.push(
+        `/account-type-selection?email=${encodeURIComponent(
+          authUser?.email || ""
+        )}`
+      );
+    }
+  };
+
+  // ── OAuth detection via sessionStorage (immune to URL cleanup) ────────────
+  // We set 'epoch_oauth_pending' BEFORE redirecting to Google, so when we
+  // return to /signin the flag still exists — even after Supabase clears
+  // ?code= from the URL synchronously during client init.
+  useEffect(() => {
+    const OAUTH_KEY = "epoch_oauth_pending";
+    const isOAuthCallback = sessionStorage.getItem(OAUTH_KEY) === "true";
+
+    // Show loader immediately if we're returning from Google
+    if (isOAuthCallback) {
+      setIsOAuthLoading(true);
+    }
+
+    let unsubscribe: { data: { subscription: { unsubscribe: () => void } } } | null = null;
+    let oauthTimeoutId: ReturnType<typeof setTimeout>;
+
+    const init = async () => {
+      const { supabase } = await import("@/lib/supabase");
+
+      if (isOAuthCallback) {
+        // Safety timeout — if the exchange hasn't completed in 12 seconds,
+        // clear the flag and show an error so the user isn't stuck forever.
+        oauthTimeoutId = setTimeout(() => {
+          sessionStorage.removeItem(OAUTH_KEY);
+          setIsOAuthLoading(false);
+          setAuthError(
+            "Google sign in timed out. Please try again."
+          );
+        }, 12000);
+
+        // Set up listener BEFORE getSession() to avoid missing the SIGNED_IN event
+        unsubscribe = supabase.auth.onAuthStateChange(async (event) => {
+          if (event === "SIGNED_IN") {
+            clearTimeout(oauthTimeoutId);
+            sessionStorage.removeItem(OAUTH_KEY);
+            await handleAuthAndRedirect();
+          }
+        }) as unknown as { data: { subscription: { unsubscribe: () => void } } };
+
+        // getSession() triggers / awaits the PKCE code exchange.
+        // If the session is already available, redirect right away.
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          clearTimeout(oauthTimeoutId);
+          sessionStorage.removeItem(OAUTH_KEY);
+          await handleAuthAndRedirect();
+        }
+      } else {
+        // Regular /signin visit — sign out any stale session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await supabase.auth.signOut();
+          localStorage.removeItem("epoch_session_login_at");
+        }
+
+        // Listen for email sign-in
+        unsubscribe = supabase.auth.onAuthStateChange(async (event) => {
+          if (event === "SIGNED_IN") {
+            const initiated = (window as typeof window & { __epochLoginInitiated?: boolean }).__epochLoginInitiated;
+            if (initiated) {
+              (window as typeof window & { __epochLoginInitiated?: boolean }).__epochLoginInitiated = false;
+              await handleAuthAndRedirect();
+            }
+          }
+        }) as unknown as { data: { subscription: { unsubscribe: () => void } } };
+      }
+    };
+
+    init();
+
+    return () => {
+      clearTimeout(oauthTimeoutId);
+      try {
+        unsubscribe?.data.subscription.unsubscribe();
+      } catch (e) {
+        console.error("Failed to unsubscribe from auth state changes:", e);
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,6 +212,8 @@ export default function SignInPage() {
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) return;
+    // Mark that the user explicitly initiated login on this page
+    (window as typeof window & { __epochLoginInitiated?: boolean }).__epochLoginInitiated = true;
 
     setAuthState("email-signin");
     setAuthError("");
@@ -354,28 +400,30 @@ export default function SignInPage() {
   const handleGoogleSignIn = async () => {
     setAuthState("google-signin");
     setAuthError("");
+    // Persist OAuth intent across the Google redirect.
+    // sessionStorage survives the round-trip but is cleared on tab close.
+    sessionStorage.setItem("epoch_oauth_pending", "true");
 
     try {
       const { error } = await AuthService.signInWithGoogle();
 
       if (error) {
+        // If we couldn't even start the OAuth flow, clear the flag
+        sessionStorage.removeItem("epoch_oauth_pending");
         throw new Error(error);
       }
-
-      // Google OAuth will redirect to the callback URL
-      // The callback will be handled in the useEffect above
+      // Page will redirect to Google — nothing more to do here
     } catch (error) {
-      const errorMessage = `Google sign in failed. Please try again., ${error}`;
+      sessionStorage.removeItem("epoch_oauth_pending");
+      const errorMessage = error instanceof Error
+        ? `Google sign in failed: ${error.message}`
+        : "Google sign in failed. Please try again.";
       setAuthError(errorMessage);
-      if (toast) {
-        toast({
-          variant: "destructive",
-          title: "Google sign in failed",
-          description: errorMessage,
-        });
-      } else {
-        alert(`Google sign in failed: ${errorMessage}`);
-      }
+      toast({
+        variant: "destructive",
+        title: "Google sign in failed",
+        description: errorMessage,
+      });
       setAuthState("idle");
     }
   };
@@ -398,6 +446,27 @@ export default function SignInPage() {
   };
 
   const isProcessing = authState !== "idle";
+
+  if (isOAuthLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 relative overflow-hidden flex flex-col items-center justify-center">
+        {/* Subtle background pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute top-20 left-20 w-32 h-32 bg-gradient-to-r from-blue-400 to-green-400 rounded-full blur-3xl"></div>
+          <div className="absolute bottom-20 right-20 w-40 h-40 bg-gradient-to-r from-green-400 to-purple-400 rounded-full blur-3xl"></div>
+          <div className="absolute top-1/2 left-1/4 w-24 h-24 bg-gradient-to-r from-purple-400 to-blue-400 rounded-full blur-2xl"></div>
+        </div>
+        
+        <div className="z-10 flex flex-col items-center bg-white/50 dark:bg-slate-800/50 p-8 rounded-2xl shadow-sm backdrop-blur-sm border border-slate-200 dark:border-slate-700">
+          <Loader2 className="w-12 h-12 text-[#004DFF] animate-spin mb-4" />
+          <h3 className="text-xl font-semibold text-slate-800 dark:text-slate-200 mb-2">Authenticating</h3>
+          <p className="text-slate-600 dark:text-slate-400 text-center max-w-xs">
+            Please wait while we complete your sign-in with Google.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 relative overflow-hidden">

@@ -143,6 +143,18 @@ export default function DoctorOnboardingPage() {
     return () => clearTimeout(timer);
   }, [formData, currentStep, agreedToPolicy]);
 
+  // LEVEL 2 FIX: Auto-redirect if files are missing on step 5 (e.g. after refresh)
+  useEffect(() => {
+    if (currentStep === 5 && (!formData.profileImage || !formData.medicalLicense)) {
+      setCurrentStep(4);
+      toast({
+        title: "Documents Required",
+        description: "Please re-upload your professional documents to complete your registration.",
+        variant: "destructive",
+      });
+    }
+  }, [currentStep, formData.profileImage, formData.medicalLicense, toast]);
+
   const totalSteps = 5;
 
   const validateStep = () => {
@@ -244,6 +256,15 @@ export default function DoctorOnboardingPage() {
     if (currentStep === 5) {
       console.log('Validating step 5 fields');
       console.log('agreedToPolicy:', agreedToPolicy);
+      
+      // LEVEL 1 FIX: Strict backup check for files on the final step
+      if (!formData.profileImage) {
+        newErrors.profileImage = "Profile photo is required. Please go back and upload.";
+      }
+      if (!formData.medicalLicense) {
+        newErrors.medicalLicense = "Medical license is required. Please go back and upload.";
+      }
+      
       if (!agreedToPolicy) {
         console.log('Policy agreement is missing');
         newErrors.policy = "You must agree to the terms and conditions";
@@ -388,6 +409,17 @@ export default function DoctorOnboardingPage() {
     // Prevent multiple submissions
     if (isSubmitting) return;
     
+    // Final strict guard for files
+    if (!formData.profileImage || !formData.medicalLicense) {
+      toast({
+        title: "Missing Documents",
+        description: "Please ensure your profile photo and medical license are uploaded before submitting.",
+        variant: "destructive",
+      });
+      setCurrentStep(4);
+      return;
+    }
+    
     // Validate the final step
     if (!validateStep()) {
       return;
@@ -527,9 +559,16 @@ export default function DoctorOnboardingPage() {
       return () => clearTimeout(redirectTimer);
     } catch (error: unknown) {
       console.error("Error submitting form:", error);
-      const errorMessage = error instanceof Error 
-        ? error.message 
-        : "An unexpected error occurred. Please try again.";
+      
+      // LEVEL 1 FIX: Better guidance for "Failed to fetch"
+      let errorMessage = "An unexpected error occurred. Please try again.";
+      
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        if (errorMessage.toLowerCase().includes("fetch")) {
+          errorMessage = "Network error: Failed to upload profile. Please check your internet connection or try using smaller image files (max 1MB).";
+        }
+      }
       
       setErrors(prev => ({
         ...prev,

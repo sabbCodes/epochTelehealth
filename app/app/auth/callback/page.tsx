@@ -39,7 +39,7 @@ export default function AuthCallbackPage() {
         setMessage("Connection timed out. Please try again.");
 
         setTimeout(() => {
-          router.push("/signin");
+          router.push(returnUrl);
         }, 3000);
       }
     }, 10000);
@@ -78,10 +78,10 @@ export default function AuthCallbackPage() {
           <motion.button
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            onClick={() => router.push("/signin")}
+            onClick={() => router.push(returnUrl)}
             className="mt-6 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
-            Back to Sign In
+            Go Back
           </motion.button>
         )}
       </motion.div>

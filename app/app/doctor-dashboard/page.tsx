@@ -45,6 +45,7 @@ import {
 import { ThemeToggle } from "@/components/theme-toggle";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { NotificationDropdown } from "@/components/NotificationDropdown";
+import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 
 // ---- Types ----
 
@@ -332,6 +333,7 @@ function AvailabilityModal({
 // ---- Main Dashboard ----
 
 export default function DoctorDashboard() {
+  useSessionTimeout();
   const { doctorProfile, loading, error } = useDoctorProfile();
   const [walletBalance, setWalletBalance] = useState<string>("0.00");
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);

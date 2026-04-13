@@ -400,6 +400,14 @@ export async function POST(request: Request) {
           profileImage: formData.profileImage || profileData.profileImage,
         };
 
+        // Server-side reinforcement: Ensure mandatory files are present for doctors
+        if (!profileData.profileImage || !profileData.medicalLicense) {
+           return NextResponse.json(
+             { error: "Doctor profile requires both a profile photo and a medical license." },
+             { status: 400 }
+           );
+        }
+
         console.log(
           "Final profile data before save:",
           JSON.stringify(profileData, null, 2)

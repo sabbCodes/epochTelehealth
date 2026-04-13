@@ -40,6 +40,7 @@ import { formatName } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { NotificationDropdown } from "@/components/NotificationDropdown";
+import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 
 // ---- Types ----
 
@@ -187,6 +188,7 @@ function AppointmentRow({
 // ---- Main Dashboard ----
 
 export default function Dashboard() {
+  useSessionTimeout();
   const { userProfile, loading, error, isAuthenticated } = useUserProfile();
   const [avatarSrc, setAvatarSrc] = useState<string | undefined>();
   const [walletBalance, setWalletBalance] = useState<string>("0.00");
