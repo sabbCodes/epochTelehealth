@@ -45,29 +45,28 @@ export const VideoParticipant: React.FC<VideoParticipantProps> = ({
 
   return (
     <div className={`relative w-full h-full bg-slate-900 overflow-hidden group ${className}`}>
-      <AnimatePresence mode="wait">
-        {isVideoEnabled && participant ? (
-          <motion.div 
-            key={`video-${participant?.id}-${isVideoEnabled}`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="w-full h-full"
-          >
-            <VideoView 
-              stream={stream} 
-              mirror={isLocal}
-              muted={isLocal}
-              className="w-full h-full object-cover" 
-            />
-          </motion.div>
-        ) : (
+      
+      {/* ALWAYS keep the VideoView mounted if there's a participant to ensure audio continues playing. 
+          We hide it visually when video is disabled rather than unmounting it. */}
+      {participant && (
+        <div className={`absolute inset-0 z-0 transition-opacity duration-300 ${isVideoEnabled ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+          <VideoView 
+            stream={stream} 
+            mirror={isLocal}
+            muted={isLocal}
+            className="w-full h-full object-cover" 
+          />
+        </div>
+      )}
+
+      <AnimatePresence>
+        {(!isVideoEnabled || !participant) && (
           <motion.div 
             key="fallback"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="w-full h-full flex flex-col items-center justify-center relative"
+            className="absolute inset-0 z-10 w-full h-full flex flex-col items-center justify-center bg-slate-900"
           >
             {/* Professional Glassmorphism Background */}
             <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-950" />
@@ -113,7 +112,7 @@ export const VideoParticipant: React.FC<VideoParticipantProps> = ({
       </AnimatePresence>
 
       {/* Overlays - Hide if local and audio is enabled (nothing to show)*/}
-      <div className="absolute bottom-4 left-4 flex items-center gap-2 pointer-events-none">
+      <div className="absolute bottom-4 left-4 flex items-center gap-2 pointer-events-none z-20">
         <div className="px-3 py-1.5 glass-effect rounded-full flex items-center gap-2">
           {!isAudioEnabled && (
             <div className="text-red-500">

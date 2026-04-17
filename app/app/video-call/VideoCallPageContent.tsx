@@ -19,6 +19,7 @@ export default function VideoCallPageContent() {
   const [remoteUser, setRemoteUser] = useState<any>(null);
   const [patientProfileId, setPatientProfileId] = useState<string>("");
   const [loading, setLoading] = useState(true);
+  const [authError, setAuthError] = useState<string>("");
 
   const { userProfile: currentUser } = useUserProfile();
   const { toast } = useToast();
@@ -52,13 +53,18 @@ export default function VideoCallPageContent() {
         // 2. Read room URL from schedule (do NOT create a room here)
         const { data: scheduleRow, error: scheduleError } = await supabase
           .from("schedules")
-          .select("room_url")
+          .select("room_url, doctor_id, patient_id")
           .eq("id", appointmentId)
           .single();
 
         if (scheduleError) {
           console.warn("Could not fetch schedule row:", scheduleError);
           throw scheduleError;
+        }
+
+        if (scheduleRow.doctor_id !== currentUser.id && scheduleRow.patient_id !== currentUser.id) {
+          setAuthError("Unauthorized Access: You are not the assigned doctor or patient for this consultation.");
+          throw new Error("Unauthorized Access.");
         }
 
         const roomUrl = scheduleRow?.room_url;
@@ -170,6 +176,23 @@ export default function VideoCallPageContent() {
         <div className="text-center">
           <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="mt-4 text-gray-300">Setting up your call...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (authError) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-center text-slate-200 bg-slate-900 border border-red-500/30 p-8 rounded-2xl shadow-2xl max-w-md mx-4">
+          <div className="w-16 h-16 bg-red-500/20 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-red-500/30">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"></path><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          </div>
+          <h2 className="text-2xl font-bold mb-3 tracking-tight">Access Denied</h2>
+          <p className="text-slate-400 text-sm mb-6 leading-relaxed bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">{authError}</p>
+          <Button onClick={() => window.location.href = '/dashboard'} className="w-full bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 shadow-none font-bold">
+            Return to Dashboard
+          </Button>
         </div>
       </div>
     );

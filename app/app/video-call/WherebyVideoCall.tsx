@@ -10,7 +10,7 @@ import {
   Video, VideoOff, Mic, MicOff, PhoneOff, 
   MessageCircle, FileText, Monitor, 
   Plus, Send, Activity, X, ChevronRight, 
-  Settings, ShieldCheck, Trash2, Save, RefreshCw, ChevronDown
+  Settings, ShieldCheck, Trash2, Save, RefreshCw, ChevronDown, Check, Upload, Image as ImageIcon, Circle
 } from "lucide-react";
 import { VideoParticipant } from '@/components/video/VideoParticipant';
 import { HealthRecordForm } from '@/components/health-record-form';
@@ -139,8 +139,36 @@ export function WherebyVideoCall({
 }: WherebyVideoCallProps) {
   const [callDuration, setCallDuration] = useState(0);
   const [showChat, setShowChat] = useState(false);
-  const [showClinicalPanel, setShowClinicalPanel] = useState(role === "doctor");
+  const [showClinicalPanel, setShowClinicalPanel] = useState(false);
+  const [showSettingsPopup, setShowSettingsPopup] = useState(false);
+  const [activeBackground, setActiveBackground] = useState<'none' | 'blur' | 'office' | 'clinic' | 'abstract' | 'custom'>('none');
+  const [customBgUrl, setCustomBgUrl] = useState<string | null>(null);
+
+  const [isLocalRecording, setIsLocalRecording] = useState(false);
+  const [isRemoteRecording, setIsRemoteRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<BlobPart[]>([]);
+
   const [newMessage, setNewMessage] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
+  const prevVisibleCount = useRef(0);
+
+  const [showControls, setShowControls] = useState(true);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleUserActivity = React.useCallback(() => {
+    setShowControls(true);
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    controlsTimeoutRef.current = setTimeout(() => setShowControls(false), 4000);
+  }, []);
+
+  useEffect(() => {
+    handleUserActivity();
+    return () => {
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    };
+  }, [handleUserActivity]);
+
   const chatEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -160,12 +188,17 @@ export function WherebyVideoCall({
   // Core SDK Hooks
   const roomConnectionOptions = React.useMemo(() => ({
     localMediaOptions: {
-      audio: true,
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
       video: true,
     },
     displayName: localUser ? `${localUser.first_name || ''} ${localUser.last_name || ''}`.trim() : "Guest"
   }), [localUser?.first_name, localUser?.last_name]);
 
+  // @ts-expect-error: Whereby SDK types restrict audio to boolean, but the standard getUserMedia WebRTC API natively accepts MediaTrackConstraints objects
   const { state, actions } = useRoomConnection(roomUrl, roomConnectionOptions);
 
   const {
@@ -183,11 +216,159 @@ export function WherebyVideoCall({
     leaveRoom,
     sendChatMessage,
     startScreenshare,
-    stopScreenshare
+    stopScreenshare,
   } = actions;
+  
+  // Try to safely access functions that may or may not exist on all typescript versions of the sdk
+  const sdkActions: any = actions;
+  const switchCameraEffect = sdkActions.switchCameraEffect;
+  const switchCameraEffectCustom = sdkActions.switchCameraEffectCustom;
+  const clearCameraEffect = sdkActions.clearCameraEffect;
+
+  const handleBackgroundChange = async (type: typeof activeBackground, url?: string) => {
+    setActiveBackground(type);
+    setShowSettingsPopup(false);
+    
+    try {
+      if (type === 'none') {
+        if (clearCameraEffect) await clearCameraEffect();
+      } else if (type === 'blur') {
+        if (switchCameraEffect) await switchCameraEffect('blur');
+      } else if (type === 'custom' && customBgUrl) {
+        if (switchCameraEffectCustom) await switchCameraEffectCustom(customBgUrl);
+      } else if (url) {
+        if (switchCameraEffectCustom) {
+           // It's a relative URL, but Whereby usually needs absolute ones. We're making it absolute.
+           const fullUrl = new URL(url, window.location.origin).href;
+           await switchCameraEffectCustom(fullUrl);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to switch camera effect:", err);
+      toast({ title: "Effect Failed", description: "Could not apply background effect.", variant: "destructive" });
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setCustomBgUrl(url);
+      handleBackgroundChange('custom', url);
+    }
+  };
 
   // Connection logic
   const isJoiningRoom = useRef(false);
+
+  // Hidden System Message Parsing
+  useEffect(() => {
+    if (chatMessages.length > 0) {
+      const lastMsg = chatMessages[chatMessages.length - 1];
+      if (lastMsg.text === '__SYS__RECORDING_START' && lastMsg.senderId !== localParticipant?.id) {
+        setIsRemoteRecording(true);
+      } else if (lastMsg.text === '__SYS__RECORDING_STOP' && lastMsg.senderId !== localParticipant?.id) {
+        setIsRemoteRecording(false);
+      }
+    }
+  }, [chatMessages, localParticipant?.id]);
+
+  const visibleChatMessages = chatMessages.filter((msg: any) => !msg.text.startsWith('__SYS__'));
+
+  const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      prevVisibleCount.current = visibleChatMessages.length;
+      isFirstRender.current = false;
+      return;
+    }
+
+    const newMsgCount = visibleChatMessages.length - prevVisibleCount.current;
+    if (newMsgCount > 0) {
+      const latestMsg = visibleChatMessages[visibleChatMessages.length - 1];
+      const isFromSomeoneElse = latestMsg && latestMsg.senderId !== localParticipant?.id;
+      
+      if (!showChat && isFromSomeoneElse) {
+        setUnreadCount(prev => prev + newMsgCount);
+        toast({ 
+          title: "New Message", 
+          description: latestMsg.text.length > 50 ? latestMsg.text.substring(0, 50) + "..." : latestMsg.text
+        });
+      }
+    }
+    prevVisibleCount.current = visibleChatMessages.length;
+  }, [visibleChatMessages.length, showChat, localParticipant?.id, toast]);
+
+  useEffect(() => {
+    if (showChat) {
+      setUnreadCount(0);
+    }
+  }, [showChat]);
+
+  const isVideoEnabledRef = useRef<boolean | undefined>(false);
+
+  useEffect(() => {
+    isVideoEnabledRef.current = localParticipant?.isVideoEnabled;
+  }, [localParticipant?.isVideoEnabled]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (isVideoEnabledRef.current) {
+          toggleCamera();
+          sessionStorage.setItem('autoPausedVideo', 'true');
+        }
+      } else {
+        if (sessionStorage.getItem('autoPausedVideo') === 'true') {
+          toggleCamera();
+          sessionStorage.removeItem('autoPausedVideo');
+        }
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
+  }, [toggleCamera]);
+
+  const startLocalRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: "browser" }, audio: true });
+      mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      
+      mediaRecorderRef.current.ondataavailable = (e) => {
+        if (e.data.size > 0) recordedChunksRef.current.push(e.data);
+      };
+      
+      mediaRecorderRef.current.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        a.download = `Epoch_Consultation_${new Date().toISOString().split('T')[0]}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(url);
+        recordedChunksRef.current = [];
+        
+        setIsLocalRecording(false);
+        sendChatMessage('__SYS__RECORDING_STOP');
+      };
+      
+      stream.getVideoTracks()[0].onended = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+          mediaRecorderRef.current.stop();
+        }
+      };
+
+      mediaRecorderRef.current.start();
+      setIsLocalRecording(true);
+      sendChatMessage('__SYS__RECORDING_START');
+      toast({ title: "Recording Started", description: "The consultation is being recorded entirely in your browser." });
+    } catch (err) {
+      toast({ title: "Recording Failed", description: "Could not access screen recording permissions.", variant: "destructive" });
+    }
+  };
 
   useEffect(() => {
     if ((connectionStatus === "ready" || connectionStatus === "disconnected") && !isJoiningRoom.current) {
@@ -332,7 +513,12 @@ export function WherebyVideoCall({
   };
 
   return (
-    <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden font-sans">
+    <div 
+      className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden font-sans"
+      onMouseMove={handleUserActivity}
+      onTouchStart={handleUserActivity}
+      onClick={handleUserActivity}
+    >
       
       {/* Sidebar - Clinical Panel (Doctor only) */}
       <AnimatePresence>
@@ -352,7 +538,7 @@ export function WherebyVideoCall({
                   </div>
                   <h2 className="font-bold text-lg">Clinical Panel</h2>
                 </div>
-                <button onClick={() => setShowClinicalPanel(false)} className="text-slate-500 hover:text-white transition-colors">
+                <button onClick={() => setShowClinicalPanel(false)} className="p-1.5 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-full transition-all" title="Close Panel">
                   <X size={18} />
                 </button>
               </div>
@@ -483,14 +669,25 @@ export function WherebyVideoCall({
             {!showClinicalPanel && role === "doctor" && (
               <button 
                 onClick={() => setShowClinicalPanel(true)}
-                className="p-3 bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-700 hover:border-blue-500 transition-all group"
+                className="px-3 sm:px-4 py-2 sm:py-2.5 bg-blue-600/20 text-blue-400 backdrop-blur-md rounded-xl border border-blue-500/30 hover:bg-blue-600 hover:text-white hover:border-blue-500 transition-all flex items-center gap-2 shadow-lg"
+                title="Open Clinical Panel"
               >
-                <ChevronRight className="group-hover:translate-x-0.5 transition-transform" />
+                <Activity size={18} />
+                <span className="font-bold text-sm hidden sm:inline">Clinical Panel</span>
               </button>
             )}
             <div className="bg-slate-900/80 backdrop-blur-md border border-slate-700 px-4 py-2 rounded-xl flex items-center gap-3">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span className="text-sm font-medium font-mono">{formatTime(callDuration)}</span>
+              {(isLocalRecording || isRemoteRecording) && (
+                 <>
+                   <div className="w-px h-4 bg-slate-700" />
+                   <div className="flex items-center gap-2 px-2 py-0.5 bg-red-500/20 text-red-400 rounded-lg">
+                     <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse border border-red-400" />
+                     <span className="text-[10px] font-bold uppercase tracking-widest hidden sm:inline">Recording</span>
+                   </div>
+                 </>
+              )}
               <div className="w-px h-4 bg-slate-700" />
               <span className="text-xs text-slate-400 flex items-center gap-1">
                 <ShieldCheck size={14} className="text-blue-500" />
@@ -499,11 +696,101 @@ export function WherebyVideoCall({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 pointer-events-auto">
-            <button className="p-2.5 bg-slate-900/80 backdrop-blur-md border border-slate-700 rounded-xl hover:bg-slate-800 transition-colors">
+          <div className="flex items-center gap-3 pointer-events-auto relative">
+            <button 
+              onClick={() => setShowSettingsPopup(!showSettingsPopup)}
+              className={`p-2.5 backdrop-blur-md border rounded-xl hover:bg-slate-800 transition-colors ${showSettingsPopup ? 'bg-slate-800 border-blue-500 text-blue-500' : 'bg-slate-900/80 border-slate-700'}`}
+            >
               <Settings size={20} />
             </button>
-            <div className="px-3 sm:px-4 py-2.5 bg-slate-900/80 backdrop-blur-md border border-slate-700 rounded-xl flex items-center sm:gap-3">
+
+            <AnimatePresence>
+              {showSettingsPopup && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                  className="absolute top-[120%] right-0 w-72 bg-slate-900 border border-slate-700/80 shadow-2xl rounded-2xl p-4 z-50 backdrop-blur-xl"
+                >
+                  <div className="flex items-center justify-between mb-3 border-b border-slate-800 pb-2">
+                    <h3 className="font-bold text-sm text-slate-200">Video Effects</h3>
+                    <button onClick={() => setShowSettingsPopup(false)} className="text-slate-500 hover:text-red-400 transition-colors">
+                      <X size={14} />
+                    </button>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Background</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button 
+                        onClick={() => handleBackgroundChange('none')}
+                        className={`aspect-video rounded-lg flex flex-col items-center justify-center border transition-all ${activeBackground === 'none' ? 'border-blue-500 bg-blue-500/10 text-blue-400' : 'border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
+                      >
+                        <Video size={16} className="mb-1" />
+                        <span className="text-[10px] font-semibold">None</span>
+                      </button>
+                      <button 
+                        onClick={() => handleBackgroundChange('blur')}
+                        className={`aspect-video rounded-lg flex flex-col items-center justify-center border transition-all ${activeBackground === 'blur' ? 'border-blue-500 bg-blue-500/10 text-blue-400' : 'border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-400'}`}
+                        style={{ backdropFilter: 'blur(4px)' }}
+                      >
+                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mb-1"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                        <span className="text-[10px] font-semibold">Blur</span>
+                      </button>
+                    </div>
+
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1 mt-4">Presets</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: 'office', name: 'Office', image: '/backgrounds/office.png' },
+                        { id: 'clinic', name: 'Clinic', image: '/backgrounds/clinic.png' },
+                        { id: 'abstract', name: 'Abstract', image: '/backgrounds/abstract.png' },
+                      ].map((preset) => (
+                        <button
+                          key={preset.id}
+                          onClick={() => handleBackgroundChange(preset.id as any, preset.image)}
+                          className={`group aspect-video rounded-lg relative overflow-hidden border transition-all ${activeBackground === preset.id ? 'border-blue-500 shadow-[0_0_0_2px_rgba(59,130,246,0.3)]' : 'border-slate-700 hover:border-slate-500'}`}
+                        >
+                          <img src={preset.image} alt={preset.name} className="w-full h-full object-cover" />
+                          <div className={`absolute inset-0 bg-black/40 flex items-end justify-center pb-1 opacity-0 group-hover:opacity-100 transition-opacity ${activeBackground === preset.id ? 'opacity-100 bg-black/60' : ''}`}>
+                            <span className="text-[9px] font-bold text-white">{preset.name}</span>
+                          </div>
+                          {activeBackground === preset.id && (
+                             <div className="absolute top-1 right-1 bg-blue-500 rounded-full p-0.5">
+                               <Check size={8} className="text-white" />
+                             </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1 mt-4">Custom</p>
+                    <div className="flex gap-2">
+                       {customBgUrl && (
+                         <button
+                           onClick={() => handleBackgroundChange('custom', customBgUrl)}
+                           className={`aspect-video w-1/3 rounded-lg relative overflow-hidden border transition-all ${activeBackground === 'custom' ? 'border-blue-500 shadow-[0_0_0_2px_rgba(59,130,246,0.3)]' : 'border-slate-700'}`}
+                         >
+                           <img src={customBgUrl} alt="Custom Background" className="w-full h-full object-cover" />
+                           {activeBackground === 'custom' && (
+                              <div className="absolute top-1 right-1 bg-blue-500 rounded-full p-0.5 z-10">
+                                <Check size={8} className="text-white" />
+                              </div>
+                           )}
+                         </button>
+                       )}
+                       <label className={`cursor-pointer ${customBgUrl ? 'w-2/3 h-auto' : 'aspect-[5/2] w-full'} rounded-lg border border-dashed border-slate-600 bg-slate-800/50 hover:bg-slate-800 hover:border-slate-500 flex flex-col items-center justify-center transition-all text-slate-400 group`}>
+                         <Upload size={16} className="mb-1 group-hover:-translate-y-0.5 transition-transform" />
+                         <span className="text-[10px] font-semibold text-center">{customBgUrl ? 'Upload New' : 'Upload Image'}</span>
+                         <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                       </label>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="px-3 sm:px-4 py-2.5 bg-slate-900/80 backdrop-blur-md border border-slate-700 rounded-xl flex items-center sm:gap-3 ml-1">
               <img src="/telehealthlogo.svg" alt="Epoch Telehealth" className="h-6 w-auto" />
               <span className="hidden sm:inline text-sm font-bold tracking-tight">Epoch <span className="text-blue-500">Telehealth</span></span>
             </div>
@@ -571,7 +858,7 @@ export function WherebyVideoCall({
             <motion.div 
               drag
               dragConstraints={{ top: 0, left: 0, right: 0, bottom: 0 }}
-              className="absolute bottom-24 right-6 w-40 h-56 sm:w-48 sm:h-64 md:w-64 md:h-40 lg:w-72 lg:h-48 rounded-2xl overflow-hidden border-2 border-slate-700 shadow-2xl z-40 bg-slate-900"
+              className={`absolute transition-all duration-500 ease-in-out right-4 sm:right-6 w-40 h-56 sm:w-48 sm:h-64 md:w-64 md:h-40 lg:w-72 lg:h-48 rounded-2xl overflow-hidden border-2 border-slate-700 shadow-2xl z-40 bg-slate-900 ${showControls ? 'bottom-24' : 'bottom-6 sm:bottom-24'}`}
             >
               <VideoParticipant 
                 key={localParticipant?.id ? `local-${localParticipant.id}` : 'local-placeholder'}
@@ -584,12 +871,12 @@ export function WherebyVideoCall({
         </div>
 
         {/* Controls Dock */}
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3 z-50">
-          <div className="glass-effect rounded-2xl p-2 px-3 flex items-center gap-3 shadow-2xl border border-slate-700/50">
+        <div className={`absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 flex items-center justify-center w-[98%] sm:w-auto z-30 transition-all duration-500 ease-in-out ${showControls ? 'translate-y-0 opacity-100' : 'translate-y-24 opacity-0 pointer-events-none sm:translate-y-0 sm:opacity-100 sm:pointer-events-auto'}`}>
+          <div className="glass-effect rounded-2xl p-1.5 sm:p-2 px-2 sm:px-3 flex items-center gap-1 sm:gap-3 shadow-2xl border border-slate-700/50 overflow-x-auto no-scrollbar max-w-full">
             <button 
               onClick={() => toggleMicrophone()}
               disabled={!localParticipant?.id}
-              className={`p-4 rounded-xl transition-all ${!localParticipant?.id ? 'opacity-50 cursor-not-allowed bg-slate-800 text-slate-500' : !localParticipant?.isAudioEnabled ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl transition-all ${!localParticipant?.id ? 'opacity-50 cursor-not-allowed bg-slate-800 text-slate-500' : !localParticipant?.isAudioEnabled ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
             >
               {localParticipant?.isAudioEnabled ? <Mic size={22} /> : <MicOff size={22} />}
             </button>
@@ -597,9 +884,36 @@ export function WherebyVideoCall({
             <button 
               onClick={() => toggleCamera()}
               disabled={!localParticipant?.id}
-              className={`p-4 rounded-xl transition-all ${!localParticipant?.id ? 'opacity-50 cursor-not-allowed bg-slate-800 text-slate-500' : !localParticipant?.isVideoEnabled ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl transition-all ${!localParticipant?.id ? 'opacity-50 cursor-not-allowed bg-slate-800 text-slate-500' : !localParticipant?.isVideoEnabled ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
             >
               {localParticipant?.isVideoEnabled ? <Video size={22} /> : <VideoOff size={22} />}
+            </button>
+
+            <button 
+              onClick={() => {
+                if (isLocalRecording) {
+                  if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                    mediaRecorderRef.current.stop();
+                  }
+                  toast({ title: "Recording Stopped", description: "Saving video file to your computer." });
+                } else {
+                  startLocalRecording();
+                }
+              }}
+              className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl transition-all relative group ${isLocalRecording ? 'bg-red-500/20 text-red-500 shadow-[0_0_15px_rgba(239,68,68,0.3)] hover:bg-red-500/30' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              title={isLocalRecording ? "Stop Recording / Save File" : "Start Local Screen Recording"}
+            >
+              {isLocalRecording ? (
+                <div className="w-5 h-5 bg-red-500 rounded-sm" />
+              ) : (
+                <Circle size={22} className="group-hover:text-red-400 transition-colors" />
+              )}
+              {isLocalRecording && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-slate-900"></span>
+                </span>
+              )}
             </button>
 
             <button 
@@ -618,7 +932,7 @@ export function WherebyVideoCall({
                   startScreenshare();
                 }
               }}
-              className={`p-4 rounded-xl transition-all ${
+              className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl transition-all ${
                 screenshares?.some(s => s.participantId === localParticipant?.id) 
                   ? 'bg-blue-600 text-white' 
                   : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
@@ -638,11 +952,13 @@ export function WherebyVideoCall({
 
             <button 
               onClick={() => setShowChat(!showChat)}
-              className={`p-4 rounded-xl transition-all relative ${showChat ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              className={`p-2.5 sm:p-4 rounded-lg sm:rounded-xl transition-all relative ${showChat ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
             >
               <MessageCircle size={22} />
-              {chatMessages.length > 0 && (
-                <span className="absolute top-2 right-2 w-2 h-2 bg-emerald-500 rounded-full border-2 border-slate-900" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[20px] h-5 px-1 bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-slate-900 shadow-md">
+                  {unreadCount > 99 ? '99+' : unreadCount}
+                </span>
               )}
             </button>
 
@@ -650,10 +966,10 @@ export function WherebyVideoCall({
 
             <button 
               onClick={handleEndCall}
-              className="p-4 px-6 bg-red-600 hover:bg-red-500 text-white rounded-xl transition-all active:scale-[0.95] flex items-center gap-2"
+              className="p-2.5 sm:p-4 px-4 sm:px-6 bg-red-600 hover:bg-red-500 text-white rounded-lg sm:rounded-xl transition-all active:scale-[0.95] flex items-center gap-2"
             >
-              <PhoneOff size={22} />
-              <span className="font-bold hidden sm:inline">End Call</span>
+              <PhoneOff size={22} className="sm:w-[22px] sm:h-[22px] w-[18px] h-[18px]" />
+              <span className="font-bold text-sm sm:text-base hidden sm:inline">End Call</span>
             </button>
           </div>
         </div>
@@ -676,13 +992,13 @@ export function WherebyVideoCall({
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-              {chatMessages.length === 0 ? (
+              {visibleChatMessages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-slate-500 opacity-50 space-y-3">
                   <MessageCircle size={40} />
                   <p className="text-sm">Start a secure session chat...</p>
                 </div>
               ) : (
-                chatMessages.map((msg: any, i) => {
+                visibleChatMessages.map((msg: any, i: number) => {
                   const isMe = msg.senderId === localParticipant?.id;
                   return (
                     <div key={i} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
