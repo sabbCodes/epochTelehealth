@@ -23,6 +23,16 @@ import idl from '@/components/epoch_telehealth.json';
 import { getMXEPublicKey, RescueCipher, x25519 } from "@arcium-hq/client";
 import { PublicKey } from "@solana/web3.js";
 import { PrescriptionForm } from '@/components/prescription-form';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface UserProfile {
   id?: string;
@@ -153,6 +163,10 @@ export function WherebyVideoCall({
   const [unreadCount, setUnreadCount] = useState(0);
   const prevVisibleCount = useRef(0);
 
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [showEndRequest, setShowEndRequest] = useState(false);
+  const [isEndingSession, setIsEndingSession] = useState(false);
+
   const [showControls, setShowControls] = useState(true);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -269,6 +283,15 @@ export function WherebyVideoCall({
         setIsRemoteRecording(true);
       } else if (lastMsg.text === '__SYS__RECORDING_STOP' && lastMsg.senderId !== localParticipant?.id) {
         setIsRemoteRecording(false);
+      } else if (lastMsg.text === '__SYS__END_REQUEST' && lastMsg.senderId !== localParticipant?.id) {
+        setShowEndRequest(true);
+      } else if (lastMsg.text === '__SYS__END_ACCEPT' && lastMsg.senderId !== localParticipant?.id) {
+        toast({ title: "Session Completed", description: "The other party has agreed to end the consultation." });
+        leaveRoom();
+        window.location.href = role === "doctor" ? "/doctor-dashboard" : "/dashboard";
+      } else if (lastMsg.text === '__SYS__END_REJECT' && lastMsg.senderId !== localParticipant?.id) {
+        setIsEndingSession(false);
+        toast({ title: "Request Declined", description: "The other party wants to continue the consultation.", variant: "destructive" });
       }
     }
   }, [chatMessages, localParticipant?.id]);
@@ -510,6 +533,25 @@ export function WherebyVideoCall({
   const handleEndCall = () => {
     leaveRoom();
     window.location.href = role === "doctor" ? "/doctor-dashboard" : "/dashboard";
+  };
+
+  const finalizeEndCallAndComplete = async () => {
+    try {
+      if (appointmentId) {
+        await supabase.from('schedules').update({ status: 'completed' }).eq('id', appointmentId);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+    handleEndCall();
+  };
+
+  const initiateEndCall = () => {
+    if (!remoteParticipants || remoteParticipants.length === 0) {
+      finalizeEndCallAndComplete(); // Nobody here, just end it automatically
+    } else {
+      setShowLeaveConfirm(true);
+    }
   };
 
   return (
@@ -965,7 +1007,7 @@ export function WherebyVideoCall({
             <div className="w-px h-8 bg-slate-700 mx-1" />
 
             <button 
-              onClick={handleEndCall}
+              onClick={initiateEndCall}
               className="p-2.5 sm:p-4 px-4 sm:px-6 bg-red-600 hover:bg-red-500 text-white rounded-lg sm:rounded-xl transition-all active:scale-[0.95] flex items-center gap-2"
             >
               <PhoneOff size={22} className="sm:w-[22px] sm:h-[22px] w-[18px] h-[18px]" />
@@ -1056,6 +1098,65 @@ export function WherebyVideoCall({
           background: #475569;
         }
       `}</style>
+
+      {/* End Session Initiator Dialog */}
+      <AlertDialog open={showLeaveConfirm} onOpenChange={setShowLeaveConfirm}>
+        <AlertDialogContent className="bg-slate-900 border border-slate-700 max-w-[90vw] sm:max-w-lg z-[100]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white text-xl">End Consultation?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400 text-base">
+              Are you sure you want to request to end this session? The other party must agree before the session is officially marked as completed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                sendChatMessage('__SYS__END_REQUEST');
+                setIsEndingSession(true);
+                setShowLeaveConfirm(false);
+                toast({ title: "Request Sent", description: "Waiting for the other party to accept..." });
+              }}
+              className="bg-red-600 text-white hover:bg-red-500"
+            >
+              Request End Session
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* End Session Receiver Dialog */}
+      <AlertDialog open={showEndRequest} onOpenChange={setShowEndRequest}>
+        <AlertDialogContent className="bg-slate-900 border border-slate-700 max-w-[90vw] sm:max-w-lg z-[100]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white text-xl">Consultation End Request</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-400 text-base">
+              The other participant wants to end this consultation. Do you agree to officially mark this session as completed?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel 
+              onClick={() => {
+                sendChatMessage('__SYS__END_REJECT');
+                setShowEndRequest(false);
+              }}
+              className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 hover:text-white"
+            >
+              Decline
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                sendChatMessage('__SYS__END_ACCEPT');
+                setShowEndRequest(false);
+                finalizeEndCallAndComplete();
+              }}
+              className="bg-emerald-600 text-white hover:bg-emerald-500"
+            >
+              Accept & End
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
