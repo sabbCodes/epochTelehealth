@@ -844,7 +844,9 @@ export default function AdminDashboard() {
                       <>
                         <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2"><span className="text-slate-500">License #</span><span className="font-medium">{selectedVerification.raw_data?.license_number || 'N/A'}</span></div>
                         <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2"><span className="text-slate-500">Experience</span><span className="font-medium">{selectedVerification.raw_data?.years_of_experience || 0} Years</span></div>
-                        <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2"><span className="text-slate-500">Consultation Fee</span><span className="font-medium">${selectedVerification.raw_data?.consultation_fee || '0'}</span></div>
+                        <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2"><span className="text-slate-500">30-min Chat</span><span className="font-medium">${selectedVerification.raw_data?.consultation_fee_30min_chat || 'Not set'}</span></div>
+                        <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2"><span className="text-slate-500">30-min Video</span><span className="font-medium">${selectedVerification.raw_data?.consultation_fee_30min_video || 'Not set'}</span></div>
+                        <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2"><span className="text-slate-500">60-min Video</span><span className="font-medium">${selectedVerification.raw_data?.consultation_fee_60min_video || 'Not set'}</span></div>
                         <div className="flex justify-between"><span className="text-slate-500">Education</span><span className="font-medium truncate max-w-[150px]">{selectedVerification.raw_data?.education || 'N/A'}</span></div>
                       </>
                     ) : (

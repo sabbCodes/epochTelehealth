@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+// Opt out of Next.js caching so every request hits the DB fresh
+export const dynamic = "force-dynamic";
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -20,8 +23,8 @@ export async function GET() {
       supabase.from("user_profiles").select("*", { count: "exact", head: true }),
       supabase.from("doctor_profiles").select("*", { count: "exact", head: true }),
       supabase.from("pharmacy_profiles").select("*", { count: "exact", head: true }),
-      supabase.from("doctor_profiles").select("*").eq("is_verified", false).eq("verification_status", "pending"),
-      supabase.from("pharmacy_profiles").select("*").eq("is_verified", false).eq("verification_status", "pending"),
+      supabase.from("doctor_profiles").select("*").eq("verification_status", "pending"),
+      supabase.from("pharmacy_profiles").select("*").eq("verification_status", "pending"),
       supabase.from("schedules").select("doctor_id, status").eq("status", "completed"),
       supabase.from("doctor_profiles").select("id, user_profile_id, consultation_fee"),
     ]);
@@ -43,3 +46,4 @@ export async function GET() {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
+

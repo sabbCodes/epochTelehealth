@@ -90,15 +90,11 @@ export async function sendAppointmentConfirmation(
       usingApiKey: process.env.RESEND_API_KEY ? "Yes" : "No",
     });
 
-    const { data, error } = await withRetry(() => resend.emails.send(emailData));
-
-    if (error) {
-      console.error("Error sending email:", {
-        error,
-        message: error.message,
-      });
-      return { success: false, error };
-    }
+    const { data } = await withRetry(async () => {
+      const response = await resend.emails.send(emailData);
+      if (response.error) throw response.error;
+      return response;
+    });
 
     console.log("Email sent successfully:", data);
     return { success: true, data };
@@ -131,17 +127,17 @@ export async function sendRescheduleNotification(to: string, details: Reschedule
       ? `Reschedule Request from Dr. ${details.doctorName}`
       : `Appointment Cancelled by ${details.patientName}`;
 
-    const { data, error } = await withRetry(() => resend.emails.send({
-      from: "Sabb | Epoch telehealth <noreply@epochtelehealth.com>",
-      to,
-      subject,
-      react: emailComponent,
-    }));
+    const { data } = await withRetry(async () => {
+      const response = await resend.emails.send({
+        from: "Sabb | Epoch telehealth <noreply@epochtelehealth.com>",
+        to,
+        subject,
+        react: emailComponent,
+      });
+      if (response.error) throw response.error;
+      return response;
+    });
 
-    if (error) {
-      console.error("Error sending reschedule email:", error);
-      return { success: false, error };
-    }
     return { success: true, data };
   } catch (error) {
     console.error("Failed to send reschedule email:", error);
@@ -162,17 +158,17 @@ export async function sendVerificationStatusEmail(
       ? `Your Epoch Telehealth ${role} Application is Approved!`
       : `Action Required: Your Epoch Telehealth Application`;
 
-    const { data, error } = await withRetry(() => resend.emails.send({
-      from: "Sabb | Epoch telehealth <noreply@epochtelehealth.com>",
-      to,
-      subject,
-      react: emailComponent,
-    }));
+    const { data } = await withRetry(async () => {
+      const response = await resend.emails.send({
+        from: "Sabb | Epoch telehealth <noreply@epochtelehealth.com>",
+        to,
+        subject,
+        react: emailComponent,
+      });
+      if (response.error) throw response.error;
+      return response;
+    });
 
-    if (error) {
-      console.error("Error sending verification email:", error);
-      return { success: false, error };
-    }
     return { success: true, data };
   } catch (error) {
     console.error("Failed to send verification email:", error);

@@ -66,6 +66,13 @@ export async function POST(request: Request) {
     const phone = formData.get('phone');
     if (phone !== null) updates.phone = phone;
 
+    // Profile image upload
+    const profileImage = formData.get('profileImage');
+    if (profileImage instanceof File && profileImage.size > 0) {
+      const url = await uploadFile(profileImage, 'avatars', 'profile_images');
+      if (url) updates.profile_image = url;
+    }
+
     // Parse role-specific fields
     if (role === 'doctor') {
       const fee30Chat = formData.get('fee30Chat');

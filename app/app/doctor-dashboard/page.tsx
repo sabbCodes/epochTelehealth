@@ -986,6 +986,12 @@ export default function DoctorDashboard() {
                 const formData = new FormData(form)
                 
                 // Validate file sizes (1MB max)
+                const profileImage = formData.get('profileImage');
+                if (profileImage instanceof File && profileImage.size > 1 * 1024 * 1024) {
+                  toast({ title: "File too large", description: "Profile picture must be less than 1MB.", variant: "destructive" });
+                  return;
+                }
+
                 const medicalLicense = formData.get('medicalLicense');
                 if (medicalLicense instanceof File && medicalLicense.size > 1 * 1024 * 1024) {
                   toast({ title: "File too large", description: "Medical license must be less than 1MB.", variant: "destructive" });
@@ -1012,6 +1018,35 @@ export default function DoctorDashboard() {
                   submitBtn.textContent = doctorProfile?.verification_status === 'rejected' ? 'Update & Resubmit Application' : 'Save Changes';
                 }
               }}>
+                {/* Profile Picture */}
+                <div className="flex items-center gap-5 p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-slate-700/50">
+                  <div className="relative shrink-0">
+                    <img
+                      src={doctorProfile?.profile_image || `https://ui-avatars.com/api/?name=${doctorProfile?.first_name}+${doctorProfile?.last_name}&background=004DFF&color=fff`}
+                      alt="Profile"
+                      className="w-20 h-20 rounded-full object-cover border-2 border-white dark:border-slate-700 shadow"
+                      id="profileImagePreview"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-sm mb-1">Profile Picture</p>
+                    <p className="text-xs text-slate-500 mb-2">Supported formats: JPEG, PNG (Max 1MB)</p>
+                    <Input
+                      type="file"
+                      name="profileImage"
+                      accept="image/jpeg,image/png"
+                      className="file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 text-sm"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const preview = document.getElementById('profileImagePreview') as HTMLImageElement;
+                          if (preview) preview.src = URL.createObjectURL(file);
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
                 <div className="grid md:grid-cols-2 gap-6">
                   <div>
                     <label className="block text-sm font-medium mb-1.5">Phone Number</label>
