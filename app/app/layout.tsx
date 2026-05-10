@@ -7,9 +7,35 @@ import { Toaster } from "@/components/ui/toaster";
 import ClientLayout from "./client-layout";
 
 export const metadata: Metadata = {
-  title: "Epoch telehealth - Healthcare Without Borders",
+  title: "Epoch telehealth – Healthcare Without Borders",
   description:
     "Connect with world-class doctors from anywhere. Secure your medical records on blockchain.",
+  metadataBase: new URL("https://www.epochtelehealth.com"),
+  openGraph: {
+    title: "Epoch telehealth – Healthcare Without Borders",
+    description:
+      "Connect with world-class doctors from anywhere. Secure your medical records on blockchain.",
+    url: "https://www.epochtelehealth.com",
+    siteName: "Epoch telehealth",
+    images: [
+      {
+        url: "/epochOgp.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Epoch telehealth – Healthcare Without Borders",
+      },
+    ],
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Epoch telehealth – Healthcare Without Borders",
+    description:
+      "Connect with world-class doctors from anywhere. Secure your medical records on blockchain.",
+    images: ["/epochOgp.jpg"],
+    site: "@epochtelehealth",
+  },
 };
 
 export default function RootLayout({

@@ -1,8 +1,34 @@
 import { Resend } from "resend";
 import { AppointmentEmail } from "@/components/emails/AppointmentEmail";
 import { RescheduleEmail } from "@/components/emails/RescheduleEmail";
+import { VerificationEmail } from "@/components/emails/VerificationEmail";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+/**
+ * Helper to retry async functions for transient errors
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let attempt = 0;
+  while (attempt < maxRetries) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      attempt++;
+      console.warn(`Attempt ${attempt} failed: ${error.message || 'Unknown error'}`);
+      if (attempt >= maxRetries) {
+        throw error;
+      }
+      // Exponential backoff
+      await new Promise(resolve => setTimeout(resolve, baseDelay * Math.pow(2, attempt - 1)));
+    }
+  }
+  throw new Error("Unreachable");
+}
 
 interface EmailAttachment {
   filename: string;
@@ -64,7 +90,7 @@ export async function sendAppointmentConfirmation(
       usingApiKey: process.env.RESEND_API_KEY ? "Yes" : "No",
     });
 
-    const { data, error } = await resend.emails.send(emailData);
+    const { data, error } = await withRetry(() => resend.emails.send(emailData));
 
     if (error) {
       console.error("Error sending email:", {
@@ -105,12 +131,12 @@ export async function sendRescheduleNotification(to: string, details: Reschedule
       ? `Reschedule Request from Dr. ${details.doctorName}`
       : `Appointment Cancelled by ${details.patientName}`;
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await withRetry(() => resend.emails.send({
       from: "Sabb | Epoch telehealth <noreply@epochtelehealth.com>",
       to,
       subject,
       react: emailComponent,
-    });
+    }));
 
     if (error) {
       console.error("Error sending reschedule email:", error);
@@ -119,6 +145,37 @@ export async function sendRescheduleNotification(to: string, details: Reschedule
     return { success: true, data };
   } catch (error) {
     console.error("Failed to send reschedule email:", error);
+    return { success: false, error: error instanceof Error ? error : new Error("Unknown error") };
+  }
+}
+
+export async function sendVerificationStatusEmail(
+  to: string,
+  name: string,
+  status: "approved" | "rejected",
+  role: "doctor" | "pharmacy",
+  reason?: string
+) {
+  try {
+    const emailComponent = VerificationEmail({ name, status, reason, role });
+    const subject = status === "approved"
+      ? `Your Epoch Telehealth ${role} Application is Approved!`
+      : `Action Required: Your Epoch Telehealth Application`;
+
+    const { data, error } = await withRetry(() => resend.emails.send({
+      from: "Sabb | Epoch telehealth <noreply@epochtelehealth.com>",
+      to,
+      subject,
+      react: emailComponent,
+    }));
+
+    if (error) {
+      console.error("Error sending verification email:", error);
+      return { success: false, error };
+    }
+    return { success: true, data };
+  } catch (error) {
+    console.error("Failed to send verification email:", error);
     return { success: false, error: error instanceof Error ? error : new Error("Unknown error") };
   }
 }

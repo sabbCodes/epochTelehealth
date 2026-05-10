@@ -97,13 +97,30 @@ export default function SignInPage() {
 
     const { user: authUser } = await AuthService.getCurrentUser();
 
-    if (authUser?.user_type) {
-      const dashboardRoute = getDashboardRoute(authUser.user_type);
-      router.push(dashboardRoute);
-    } else {
+    if (!authUser?.user_type) {
+      // No role set yet — send to account-type-selection
       router.push(
         `/account-type-selection?email=${encodeURIComponent(
           authUser?.email || ""
+        )}`
+      );
+      return;
+    }
+
+    // Role is set — check if the role-specific profile row exists
+    const { data: roleProfile } = await AuthService.checkRoleProfile(
+      authUser.id,
+      authUser.user_type
+    );
+
+    if (roleProfile) {
+      // Profile complete → go to dashboard
+      router.push(getDashboardRoute(authUser.user_type));
+    } else {
+      // Role set but onboarding not completed → send to onboarding
+      router.push(
+        `/onboarding/${authUser.user_type}?email=${encodeURIComponent(
+          authUser.email
         )}`
       );
     }
@@ -251,47 +268,45 @@ export default function SignInPage() {
         // Check if user has a profile
         const { user } = await AuthService.getCurrentUser();
 
-        if (user?.user_type) {
-          // User has a profile, redirect to dashboard
-          const dashboardRoute = getDashboardRoute(user.user_type);
-
-          // Show dashboard redirection message
-          if (toast) {
-            if (user.user_type === "doctor") {
-              toast({
-                title: "Welcome back Doctor!",
-                description: `Redirecting to your dashboard...`,
-              });
-            } else if (user.user_type === "pharmacy") {
-              toast({
-                title: "Welcome back Pharmacy!",
-                description: `Redirecting to your dashboard...`,
-              });
-            } else if (user.user_type === "admin") {
-              toast({
-                title: "Welcome back Admin!",
-                description: `Redirecting to your dashboard...`,
-              });
-            } else {
-              toast({
-                title: "Welcome back!",
-                description: `Redirecting to your dashboard...`,
-              });
-            }
-          }
-
-          router.push(dashboardRoute);
-        } else {
-          // User needs to complete onboarding
-          if (toast) {
-            toast({
-              title: "Account setup required",
-              description: "Please complete your account setup to continue.",
-            });
-          }
-
+        if (!user?.user_type) {
+          // No role set — go to account-type-selection
+          toast({
+            title: "Account setup required",
+            description: "Please select your account type to continue.",
+          });
           router.push(
             `/account-type-selection?email=${encodeURIComponent(email)}`
+          );
+          return;
+        }
+
+        // Role set — check if the role-specific profile row exists
+        const { data: roleProfile } = await AuthService.checkRoleProfile(
+          user.id,
+          user.user_type
+        );
+
+        if (roleProfile) {
+          // Profile complete → welcome back + redirect to dashboard
+          const dashboardRoute = getDashboardRoute(user.user_type);
+          if (user.user_type === "doctor") {
+            toast({ title: "Welcome back Doctor!", description: "Redirecting to your dashboard..." });
+          } else if (user.user_type === "pharmacy") {
+            toast({ title: "Welcome back Pharmacy!", description: "Redirecting to your dashboard..." });
+          } else if (user.user_type === "admin") {
+            toast({ title: "Welcome back Admin!", description: "Redirecting to your dashboard..." });
+          } else {
+            toast({ title: "Welcome back!", description: "Redirecting to your dashboard..." });
+          }
+          router.push(dashboardRoute);
+        } else {
+          // Role set but onboarding not completed → send to onboarding
+          toast({
+            title: "Complete your profile",
+            description: "Please finish setting up your account to continue.",
+          });
+          router.push(
+            `/onboarding/${user.user_type}?email=${encodeURIComponent(email)}`
           );
         }
       }

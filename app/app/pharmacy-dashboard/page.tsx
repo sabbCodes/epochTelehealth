@@ -131,8 +131,6 @@ export default function PharmacyDashboardPage() {
   const { pharmacyProfile, loading, error } = usePharmacyProfile()
   const [isSidebarOpen, setSidebarOpen] = useState(true)
   const [activeTab, setActiveTab] = useState("Dashboard")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [orderFilter, setOrderFilter] = useState("all")
   const { toast } = useToast()
 
   // Responsive sidebar
@@ -280,24 +278,6 @@ export default function PharmacyDashboardPage() {
             onClick={() => setActiveTab("Inventory")}
           />
           <SidebarItem
-            icon={ClipboardList}
-            label="Prescriptions"
-            active={activeTab === "Prescriptions"}
-            onClick={() => setActiveTab("Prescriptions")}
-          />
-          <SidebarItem
-            icon={Users}
-            label="Customers"
-            active={activeTab === "Customers"}
-            onClick={() => setActiveTab("Customers")}
-          />
-          <SidebarItem
-            icon={TrendingUp}
-            label="Reports"
-            active={activeTab === "Reports"}
-            onClick={() => setActiveTab("Reports")}
-          />
-          <SidebarItem
             icon={Settings}
             label="Settings"
             active={activeTab === "Settings"}
@@ -352,13 +332,12 @@ export default function PharmacyDashboardPage() {
            </div>
            <div className="flex items-center gap-3">
              <NotificationDropdown userId={pharmacyProfile?.user_profile_id || ""} />
-             <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl">
-               <Plus size={20} />
-             </button>
            </div>
         </header>
 
         <div className="p-4 lg:p-8 max-w-7xl mx-auto">
+          {activeTab === "Dashboard" && (
+            <>
           <div className="mb-8">
             <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">Pharmacy Dashboard</h1>
             <p className="text-slate-500 dark:text-slate-400 mt-1">Manage medications, fulfillment, and customer deliveries.</p>
@@ -489,6 +468,162 @@ export default function PharmacyDashboardPage() {
               </Card>
             </div>
           </div>
+          </>
+          )}
+
+          {activeTab === "Settings" && (
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-100 dark:border-slate-700 shadow-sm max-w-4xl mx-auto">
+              <h2 className="text-xl font-bold mb-6">Pharmacy Settings</h2>
+              
+              {pharmacyProfile?.verification_status === 'rejected' && (
+                <div className="mb-8 p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl">
+                  <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400 font-bold mb-2">
+                    <AlertCircle size={18} />
+                    Application Update Required
+                  </div>
+                  <p className="text-sm text-rose-600 dark:text-rose-300 mb-2">
+                    Your pharmacy application to join Epoch Telehealth requires updates before it can be approved.
+                  </p>
+                  <div className="bg-white dark:bg-rose-950 p-3 rounded-lg border border-rose-100 dark:border-rose-900 text-sm font-medium text-rose-800 dark:text-rose-200">
+                    <span className="font-bold">Reason from Admin:</span> {pharmacyProfile?.rejection_reason || "Please update your pharmacy details."}
+                  </div>
+                </div>
+              )}
+              
+              <form className="space-y-6" onSubmit={async (e) => {
+                e.preventDefault()
+                const form = e.currentTarget;
+                const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+                const formData = new FormData(form)
+                
+                // Validate file sizes (1MB max)
+                const pharmacyLicense = formData.get('pharmacyLicense');
+                if (pharmacyLicense instanceof File && pharmacyLicense.size > 1 * 1024 * 1024) {
+                  toast({ title: "File too large", description: "Pharmacy license must be less than 1MB.", variant: "destructive" });
+                  return;
+                }
+                const businessRegistration = formData.get('businessRegistration');
+                if (businessRegistration instanceof File && businessRegistration.size > 1 * 1024 * 1024) {
+                  toast({ title: "File too large", description: "Business registration must be less than 1MB.", variant: "destructive" });
+                  return;
+                }
+
+                formData.append('role', 'pharmacy')
+                formData.append('id', pharmacyProfile?.id || '')
+
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Saving...';
+                
+                try {
+                  const res = await fetch('/api/user/update-profile', {
+                    method: 'POST',
+                    body: formData
+                  })
+                  if (!res.ok) throw new Error("Failed to update profile")
+                  toast({ title: "Success", description: "Profile updated successfully. Your application is now pending review." })
+                  window.location.reload()
+                } catch (err: any) {
+                  toast({ title: "Error", description: err.message, variant: "destructive" })
+                  submitBtn.disabled = false;
+                  submitBtn.textContent = pharmacyProfile?.verification_status === 'rejected' ? 'Update & Resubmit Application' : 'Save Changes';
+                }
+              }}>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Phone Number</label>
+                    <Input 
+                      name="phone"
+                      type="tel"
+                      defaultValue={pharmacyProfile?.phone || ""}
+                      placeholder="+1234567890"
+                      pattern="[+\d\s\-()]*"
+                      onKeyDown={(e) => {
+                        if (!/[\d+\s\-()]/.test(e.key) && !['Backspace','Delete','ArrowLeft','ArrowRight','Tab'].includes(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">City</label>
+                    <Input name="city" defaultValue={pharmacyProfile?.city || ""} placeholder="Lagos" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-1.5">Pharmacy Description / Bio</label>
+                    <textarea 
+                      name="bio"
+                      defaultValue={pharmacyProfile?.bio || ""}
+                      className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 min-h-[120px]"
+                      placeholder="Tell customers about your pharmacy, operating hours, etc..."
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-1.5">Pharmacy License</label>
+                    {pharmacyProfile?.verification_status === 'approved' ? (
+                      <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Document securely stored and approved.</span>
+                        {pharmacyProfile.license_url && (
+                           <a href={pharmacyProfile.license_url} target="_blank" rel="noreferrer" className="text-sm text-[#004DFF] font-bold hover:underline flex items-center gap-1">
+                             <Eye size={16} /> View Document
+                           </a>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {pharmacyProfile?.license_url && (
+                           <a href={pharmacyProfile.license_url} target="_blank" rel="noreferrer" className="text-sm text-[#004DFF] font-bold hover:underline mb-2 flex items-center gap-1">
+                             <Eye size={16} /> View Current Document
+                           </a>
+                        )}
+                        <Input 
+                          type="file" 
+                          name="pharmacyLicense" 
+                          accept="image/*,.pdf" 
+                          className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-1.5">Business Registration Document</label>
+                    {pharmacyProfile?.verification_status === 'approved' ? (
+                      <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Document securely stored and approved.</span>
+                        {pharmacyProfile.registration_url && (
+                           <a href={pharmacyProfile.registration_url} target="_blank" rel="noreferrer" className="text-sm text-[#004DFF] font-bold hover:underline flex items-center gap-1">
+                             <Eye size={16} /> View Document
+                           </a>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {pharmacyProfile?.registration_url && (
+                           <a href={pharmacyProfile.registration_url} target="_blank" rel="noreferrer" className="text-sm text-[#004DFF] font-bold hover:underline mb-2 flex items-center gap-1">
+                             <Eye size={16} /> View Current Document
+                           </a>
+                        )}
+                        <Input 
+                          type="file" 
+                          name="businessRegistration" 
+                          accept="image/*,.pdf" 
+                          className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
+                        <p className="text-xs text-slate-500 mt-2">Upload new documents only if you need to update them. Supported formats: JPEG, PNG, PDF (Max 1MB).</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex justify-end pt-4">
+                  <button type="submit" className="bg-[#004DFF] hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-xl font-bold transition-colors">
+                    {pharmacyProfile?.verification_status === 'rejected' ? 'Update & Resubmit Application' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
       </main>
     </div>

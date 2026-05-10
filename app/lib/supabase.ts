@@ -46,6 +46,29 @@ export const createUserProfile = async (
   return { data, error };
 };
 
+// Helper function to check if a role-specific profile row exists
+export const getRoleProfile = async (
+  userId: string,
+  userType: "patient" | "doctor" | "pharmacy" | "admin"
+) => {
+  const tableMap: Record<string, string> = {
+    patient: "patient_profiles",
+    doctor: "doctor_profiles",
+    pharmacy: "pharmacy_profiles",
+    admin: "admin_profiles",
+  };
+
+  const table = tableMap[userType];
+
+  const { data, error } = await supabase
+    .from(table)
+    .select("id")
+    .eq("user_profile_id", userId)
+    .maybeSingle();
+
+  return { data, error };
+};
+
 // Helper function to update wallet info
 export const updateUserWallet = async (
   userId: string,

@@ -17,9 +17,15 @@ type DoctorProfile = Database["public"]["Tables"]["doctor_profiles"]["Row"] & {
   rating?: number;
   total_reviews?: number;
   consultation_fee?: number;
+  consultation_fee_30min_chat?: number;
+  consultation_fee_30min_video?: number;
+  consultation_fee_60min_video?: number;
   total_patients?: number;
   monthly_earnings?: number;
   today_appointments_count?: number;
+  verification_status?: string;
+  rejection_reason?: string;
+  medical_license_url?: string;
 };
 
 interface UseDoctorProfileReturn {

@@ -22,6 +22,11 @@ type PharmacyProfile = {
   is_verified: boolean;
   operating_hours: any;
   email?: string;
+  bio?: string | null;
+  verification_status?: string;
+  rejection_reason?: string | null;
+  license_url?: string | null;
+  registration_url?: string | null;
 };
 
 interface UsePharmacyProfileReturn {
@@ -117,6 +122,9 @@ export function usePharmacyProfile(): UsePharmacyProfileReturn {
             is_verified: false,
             operating_hours: {},
             email: userProfile.email,
+            bio: null,
+            verification_status: 'pending',
+            rejection_reason: null,
         });
       }
       

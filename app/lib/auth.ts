@@ -3,6 +3,7 @@ import {
   createUserProfile,
   getUserProfile,
   updateUserWallet,
+  getRoleProfile,
 } from "./supabase";
 
 export interface AuthUser {
@@ -220,6 +221,26 @@ export class AuthService {
         exists: false,
         user: null,
         error: error instanceof Error ? error.message : "Failed to check user",
+      };
+    }
+  }
+
+  // Check if a role-specific profile row exists (i.e. user has completed onboarding)
+  static async checkRoleProfile(
+    userId: string,
+    userType: "patient" | "doctor" | "pharmacy" | "admin"
+  ) {
+    try {
+      const { data, error } = await getRoleProfile(userId, userType);
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      return {
+        data: null,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to check role profile",
       };
     }
   }

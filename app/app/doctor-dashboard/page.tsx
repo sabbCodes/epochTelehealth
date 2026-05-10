@@ -23,6 +23,9 @@ import {
   Settings,
   Menu,
   X,
+  Bell,
+  ClipboardList,
+  Eye,
 } from "lucide-react";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
@@ -759,7 +762,9 @@ export default function DoctorDashboard() {
             </p>
           </div>
 
-          {/* Stats Grid */}
+          {activeTab === "Dashboard" && (
+            <>
+              {/* Stats Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
             {stats.map((stat, idx) => (
               <motion.div
@@ -952,6 +957,137 @@ export default function DoctorDashboard() {
               </section>
             </div>
           </div>
+          </>
+          )}
+
+          {activeTab === "Settings" && (
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-100 dark:border-slate-700 shadow-sm max-w-4xl mx-auto">
+              <h2 className="text-xl font-bold mb-6">Profile Settings</h2>
+              
+              {doctorProfile?.verification_status === 'rejected' && (
+                <div className="mb-8 p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 rounded-xl">
+                  <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400 font-bold mb-2">
+                    <AlertCircle size={18} />
+                    Application Update Required
+                  </div>
+                  <p className="text-sm text-rose-600 dark:text-rose-300 mb-2">
+                    Your application to join Epoch Telehealth requires updates before it can be approved.
+                  </p>
+                  <div className="bg-white dark:bg-rose-950 p-3 rounded-lg border border-rose-100 dark:border-rose-900 text-sm font-medium text-rose-800 dark:text-rose-200">
+                    <span className="font-bold">Reason from Admin:</span> {doctorProfile?.rejection_reason || "Please update your profile details."}
+                  </div>
+                </div>
+              )}
+              
+              <form className="space-y-6" onSubmit={async (e) => {
+                e.preventDefault()
+                const form = e.currentTarget;
+                const submitBtn = form.querySelector('button[type="submit"]') as HTMLButtonElement;
+                const formData = new FormData(form)
+                
+                // Validate file sizes (1MB max)
+                const medicalLicense = formData.get('medicalLicense');
+                if (medicalLicense instanceof File && medicalLicense.size > 1 * 1024 * 1024) {
+                  toast({ title: "File too large", description: "Medical license must be less than 1MB.", variant: "destructive" });
+                  return;
+                }
+
+                formData.append('role', 'doctor')
+                formData.append('id', doctorProfile?.id || '')
+                
+                submitBtn.disabled = true;
+                submitBtn.textContent = 'Saving...';
+
+                try {
+                  const res = await fetch('/api/user/update-profile', {
+                    method: 'POST',
+                    body: formData
+                  })
+                  if (!res.ok) throw new Error("Failed to update profile")
+                  toast({ title: "Success", description: "Profile updated successfully. Your application is now pending review." })
+                  window.location.reload()
+                } catch (err: any) {
+                  toast({ title: "Error", description: err.message, variant: "destructive" })
+                  submitBtn.disabled = false;
+                  submitBtn.textContent = doctorProfile?.verification_status === 'rejected' ? 'Update & Resubmit Application' : 'Save Changes';
+                }
+              }}>
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">Phone Number</label>
+                    <Input 
+                      name="phone" 
+                      type="tel"
+                      defaultValue={doctorProfile?.phone || ""} 
+                      placeholder="+1234567890"
+                      pattern="[+\d\s\-()]*"
+                      onKeyDown={(e) => {
+                        if (!/[\d+\s\-()]/.test(e.key) && !['Backspace','Delete','ArrowLeft','ArrowRight','Tab'].includes(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">30-min Chat Fee (USD)</label>
+                    <Input name="fee30Chat" type="number" step="0.01" defaultValue={doctorProfile?.consultation_fee_30min_chat ?? ""} placeholder="25.00" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">30-min Video Fee (USD)</label>
+                    <Input name="fee30Video" type="number" step="0.01" defaultValue={doctorProfile?.consultation_fee_30min_video ?? ""} placeholder="50.00" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1.5">60-min Video Fee (USD)</label>
+                    <Input name="fee60Video" type="number" step="0.01" defaultValue={doctorProfile?.consultation_fee_60min_video ?? ""} placeholder="90.00" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-1.5">Professional Bio</label>
+                    <textarea 
+                      name="bio"
+                      defaultValue={doctorProfile?.bio || ""}
+                      className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 min-h-[120px]"
+                      placeholder="Tell patients about your experience and expertise..."
+                    />
+                  </div>
+                  
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium mb-1.5">Medical License Document</label>
+                    {doctorProfile?.verification_status === 'approved' ? (
+                      <div className="p-3 bg-slate-50 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                        <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Document securely stored and approved.</span>
+                        {doctorProfile.medical_license_url && (
+                           <a href={doctorProfile.medical_license_url} target="_blank" rel="noreferrer" className="text-sm text-[#004DFF] font-bold hover:underline flex items-center gap-1">
+                             <Eye size={16} /> View Document
+                           </a>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {doctorProfile?.medical_license_url && (
+                           <a href={doctorProfile.medical_license_url} target="_blank" rel="noreferrer" className="text-sm text-[#004DFF] font-bold hover:underline mb-2 flex items-center gap-1">
+                             <Eye size={16} /> View Current Document
+                           </a>
+                        )}
+                        <Input 
+                          type="file" 
+                          name="medicalLicense" 
+                          accept="image/*,.pdf" 
+                          className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                        />
+                        <p className="text-xs text-slate-500">Upload a new document only if you need to update it. Supported formats: JPEG, PNG, PDF (Max 1MB).</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex justify-end pt-4">
+                  <button type="submit" className="bg-[#004DFF] hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-xl font-bold transition-colors">
+                    {doctorProfile?.verification_status === 'rejected' ? 'Update & Resubmit Application' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
       </main>
 

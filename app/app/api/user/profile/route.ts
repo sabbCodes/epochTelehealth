@@ -515,6 +515,9 @@ export async function POST(request: Request) {
         profileData = {
           ...profileData,
           userType: "admin",
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          phone: formData.phone,
           role: formData.role || "admin",
           department: formData.department,
         };
@@ -878,7 +881,82 @@ export async function POST(request: Request) {
         console.error("Error in pharmacy profile processing:", error);
         throw error;
       }
+    } else if (profileData.userType === "admin") {
+      // Handle admin profiles
+      console.log("Upserting admin profile with data:", {
+        user_profile_id: userData.id,
+        first_name: profileData.firstName,
+        last_name: profileData.lastName,
+      });
+
+      // Check if an admin profile already exists
+      const { data: existingAdmin } = await supabase
+        .from("admin_profiles")
+        .select("id")
+        .eq("user_profile_id", userData.id)
+        .maybeSingle();
+
+      let adminData;
+      let adminError;
+
+      if (existingAdmin) {
+        const { data, error } = await supabase
+          .from("admin_profiles")
+          .update({
+            first_name: profileData.firstName,
+            last_name: profileData.lastName,
+            phone: profileData.phone || null,
+            role: profileData.role || "admin",
+            department: profileData.department || null,
+            wallet_address: profileData.walletAddress || null,
+            profile_image: profileData.profileImage || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingAdmin.id)
+          .select()
+          .single();
+        adminData = data;
+        adminError = error;
+      } else {
+        const { data, error } = await supabase
+          .from("admin_profiles")
+          .insert({
+            user_profile_id: userData.id,
+            first_name: profileData.firstName,
+            last_name: profileData.lastName,
+            phone: profileData.phone || null,
+            role: profileData.role || "admin",
+            department: profileData.department || null,
+            wallet_address: profileData.walletAddress || null,
+            profile_image: profileData.profileImage || null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+        adminData = data;
+        adminError = error;
+      }
+
+      if (adminError) {
+        console.error("Error in admin profile upsert:", adminError);
+        throw new Error(
+          `Failed to create/update admin profile: ${adminError.message}`
+        );
+      }
+
+      console.log("Admin profile upserted successfully:", adminData);
+
+      userProfile = {
+        ...userData,
+        ...adminData,
+        firstName: adminData.first_name,
+        lastName: adminData.last_name,
+        walletAddress: adminData.wallet_address,
+        profileImage: adminData.profile_image,
+      };
     } else {
+      // Fallback for any unhandled user type
       userProfile = {
         ...userData,
         firstName: profileData.firstName,

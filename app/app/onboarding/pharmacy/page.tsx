@@ -10,7 +10,6 @@ import {
   Building,
   CheckCircle,
   Shield,
-  Clock,
   AlertCircle,
   Wallet,
   Copy,
@@ -31,7 +30,6 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import { AnimatePresence } from "framer-motion";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
@@ -70,40 +68,7 @@ export default function PharmacyOnboardingPage() {
   const email = searchParams?.get("email") || "";
   const walletAddress = searchParams?.get("walletAddress") || "";
 
-  interface OperatingHoursDay {
-    open: string;
-    close: string;
-    isOpen: boolean;
-  }
 
-  interface OperatingHours {
-    monday: OperatingHoursDay;
-    tuesday: OperatingHoursDay;
-    wednesday: OperatingHoursDay;
-    thursday: OperatingHoursDay;
-    friday: OperatingHoursDay;
-    saturday: OperatingHoursDay;
-    sunday: OperatingHoursDay;
-    [key: string]: OperatingHoursDay;
-  }
-
-  interface Services {
-    prescription: boolean;
-    otc: boolean;
-    homeDelivery: boolean;
-    consultation: boolean;
-    vaccination: boolean;
-    healthScreening: boolean;
-    [key: string]: boolean;
-  }
-
-  interface PaymentMethods {
-    crypto: boolean;
-    creditCard: boolean;
-    bankTransfer: boolean;
-    mobileMoney: boolean;
-    [key: string]: boolean;
-  }
 
   interface PharmacyFormData {
     // Pharmacy Information
@@ -123,20 +88,7 @@ export default function PharmacyOnboardingPage() {
     yearEstablished: string;
     website: string;
     description: string;
-    
-    // Operational Details
-    operatingHours: OperatingHours;
-    deliveryRadius: string;
-    deliveryFee: string;
-    minimumOrderValue: string;
-    acceptsInsurance: boolean;
-    insuranceProviders: string[];
-    
-    // Services
-    services: Services;
-    
-    // Payment Methods
-    paymentMethods: PaymentMethods;
+
     
     // Files and URLs
     pharmacyImages: File[];
@@ -168,39 +120,6 @@ export default function PharmacyOnboardingPage() {
     website: "",
     description: "",
 
-    // Operational Details
-    operatingHours: {
-      monday: { open: "09:00", close: "18:00", isOpen: true },
-      tuesday: { open: "09:00", close: "18:00", isOpen: true },
-      wednesday: { open: "09:00", close: "18:00", isOpen: true },
-      thursday: { open: "09:00", close: "18:00", isOpen: true },
-      friday: { open: "09:00", close: "18:00", isOpen: true },
-      saturday: { open: "09:00", close: "14:00", isOpen: true },
-      sunday: { open: "00:00", close: "00:00", isOpen: false },
-    },
-    deliveryRadius: "5",
-    deliveryFee: "2.50",
-    minimumOrderValue: "10.00",
-    acceptsInsurance: false,
-    insuranceProviders: [],
-
-    // Services
-    services: {
-      prescription: true,
-      otc: true,
-      homeDelivery: true,
-      consultation: false,
-      vaccination: false,
-      healthScreening: false,
-    },
-
-    // Payment Methods
-    paymentMethods: {
-      crypto: true,
-      creditCard: true,
-      bankTransfer: false,
-      mobileMoney: false,
-    },
 
     // Files and URLs
     pharmacyImages: [],
@@ -250,7 +169,28 @@ export default function PharmacyOnboardingPage() {
     return () => clearTimeout(timer);
   }, [formData, currentStep, agreedToPolicy]);
 
-  const totalSteps = 5;
+  // Auto-redirect if files are missing on review step (e.g. after page refresh)
+  useEffect(() => {
+    if (currentStep === 4) {
+      if (!formData.profileImage) {
+        setCurrentStep(2);
+        toast({
+          title: "Photo Required",
+          description: "Please re-upload your pharmacy photo to complete registration.",
+          variant: "destructive",
+        });
+      } else if (!formData.pharmacyLicense || !formData.businessRegistration) {
+        setCurrentStep(3);
+        toast({
+          title: "Documents Required",
+          description: "Please re-upload your pharmacy license and business registration to complete registration.",
+          variant: "destructive",
+        });
+      }
+    }
+  }, [currentStep, formData.profileImage, formData.pharmacyLicense, formData.businessRegistration, toast]);
+
+  const totalSteps = 4;
 
   // const validateStep = () => {
   //   const newErrors: Record<string, string> = {};
@@ -314,36 +254,7 @@ export default function PharmacyOnboardingPage() {
     }
   };
 
-  const updateNestedFormData = <K extends keyof PharmacyFormData, F extends keyof PharmacyFormData[K]>(
-    parent: K,
-    field: F,
-    value: PharmacyFormData[K][F]
-  ) => {
-    setFormData((prev) => ({
-      ...prev,
-      [parent]: {
-        ...(prev[parent] as object),
-        [field]: value,
-      },
-    }));
-  };
 
-  const updateOperatingHours = (
-    day: keyof OperatingHours,
-    field: keyof OperatingHoursDay,
-    value: string | boolean
-  ) => {
-    setFormData((prev) => ({
-      ...prev,
-      operatingHours: {
-        ...prev.operatingHours,
-        [day]: {
-          ...prev.operatingHours[day],
-          [field]: value,
-        },
-      },
-    }));
-  };
 
   const handlePharmacyImagesUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -572,9 +483,14 @@ export default function PharmacyOnboardingPage() {
         currentStepErrors.description = "Description must be at least 30 characters";
         hasErrors = true;
       }
-    } else if (currentStep === 4) {
-      if (!formData.profileImage) {
-        currentStepErrors.profileImage = "Profile image is required";
+      if (!formData.pharmacyLicense) {
+        console.log('[nextStep] Missing pharmacy license');
+        currentStepErrors.pharmacyLicense = "Pharmacy license image is required";
+        hasErrors = true;
+      }
+      if (!formData.businessRegistration) {
+        console.log('[nextStep] Missing business registration');
+        currentStepErrors.businessRegistration = "Business registration image is required";
         hasErrors = true;
       }
     }
@@ -703,6 +619,21 @@ export default function PharmacyOnboardingPage() {
   if (e) {
     e.preventDefault();
   }
+
+    // Final strict guard for files
+    if (!formData.profileImage || !formData.pharmacyLicense || !formData.businessRegistration) {
+      toast({
+        title: "Missing Documents",
+        description: "Please ensure your pharmacy photo, license, and business registration are uploaded before submitting.",
+        variant: "destructive",
+      });
+      if (!formData.profileImage) {
+        setCurrentStep(2);
+      } else {
+        setCurrentStep(3);
+      }
+      return;
+    }
     // Final validation for all steps
     const allErrors: Record<string, string> = {};
     let hasErrors = false;
@@ -748,6 +679,14 @@ export default function PharmacyOnboardingPage() {
       allErrors.profileImage = "Profile image is required";
       hasErrors = true;
     }
+    if (!formData.pharmacyLicense) {
+      allErrors.pharmacyLicense = "Pharmacy license is required";
+      hasErrors = true;
+    }
+    if (!formData.businessRegistration) {
+      allErrors.businessRegistration = "Business registration is required";
+      hasErrors = true;
+    }
 
     if (!agreedToPolicy) {
       allErrors.policy = 'You must agree to the terms and conditions to continue';
@@ -787,27 +726,7 @@ export default function PharmacyOnboardingPage() {
         yearEstablished: formData.yearEstablished,
         website: formData.website || '',
         description: formData.description,
-        operatingHours: JSON.stringify(formData.operatingHours || {
-          monday: { open: "09:00", close: "18:00", isOpen: true },
-          tuesday: { open: "09:00", close: "18:00", isOpen: true },
-          wednesday: { open: "09:00", close: "18:00", isOpen: true },
-          thursday: { open: "09:00", close: "18:00", isOpen: true },
-          friday: { open: "09:00", close: "18:00", isOpen: true },
-          saturday: { open: "09:00", close: "14:00", isOpen: true },
-          sunday: { open: "00:00", close: "00:00", isOpen: false },
-        }),
-        deliveryRadiusKm: formData.deliveryRadius || 5,
-        deliveryFee: formData.deliveryFee || "2.50",
-        minimumOrderValue: formData.minimumOrderValue || "10.00",
-        acceptsInsurance: formData.acceptsInsurance || false,
-        insuranceProviders: JSON.stringify(formData.insuranceProviders || []),
-        services: JSON.stringify({
-          prescription: true,
-          otc: true,
-          homeDelivery: true,
-          consultation: false,
-          vaccination: false,
-        }),
+
         agreedToPolicy: agreedToPolicy,
         licenseUrl: formData.licenseUrl || '',
         registrationUrl: formData.registrationUrl || '',
@@ -970,17 +889,6 @@ export default function PharmacyOnboardingPage() {
     "Australia",
   ];
 
-  const insuranceProviders = [
-    "National Health Insurance",
-    "Blue Cross",
-    "Aetna",
-    "Cigna",
-    "UnitedHealthcare",
-    "Kaiser Permanente",
-    "Humana",
-    "Medicare",
-    "Medicaid",
-  ];
 
   const getFieldError = (field: string) => {
     return errors[field] ? (
@@ -1180,10 +1088,14 @@ export default function PharmacyOnboardingPage() {
                       </Label>
                       <Input
                         id="phone"
+                        type="tel"
                         value={formData.phone}
-                        onChange={(e) =>
-                          updateFormData("phone", e.target.value)
-                        }
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (val === "" || /^\+?\d*$/.test(val)) {
+                            updateFormData("phone", val);
+                          }
+                        }}
                         placeholder="+234 xxx xxx xxxx"
                         className={errors.phone ? "border-red-500" : ""}
                       />
@@ -1432,7 +1344,7 @@ export default function PharmacyOnboardingPage() {
                     <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
                       <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="font-medium text-gray-900 dark:text-white mb-2">
-                        Pharmacy License
+                        Pharmacy License <span className="text-red-500">*</span>
                       </h3>
                       <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
                         Upload a clear photo or PDF file of your pharmacy license
@@ -1458,12 +1370,17 @@ export default function PharmacyOnboardingPage() {
                           ✓ {formData.pharmacyLicense.name}
                         </p>
                       )}
+                      {errors.pharmacyLicense && (
+                        <p className="text-sm text-red-600 mt-2">
+                          {errors.pharmacyLicense}
+                        </p>
+                      )}
                     </div>
 
                     <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center">
                       <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="font-medium text-gray-900 dark:text-white mb-2">
-                        Business Registration
+                        Business Registration <span className="text-red-500">*</span>
                       </h3>
                       <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
                         Upload your business registration certificate
@@ -1491,223 +1408,18 @@ export default function PharmacyOnboardingPage() {
                           ✓ {formData.businessRegistration.name}
                         </p>
                       )}
+                      {errors.businessRegistration && (
+                        <p className="text-sm text-red-600 mt-2">
+                          {errors.businessRegistration}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </motion.div>
               )}
 
-              {/* Step 4: Services & Operations */}
+              {/* Step 4: Review & Submit */}
               {currentStep === 4 && (
-                <motion.div
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="space-y-6"
-                >
-                  <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-[#004DFF] rounded-full flex items-center justify-center mx-auto mb-4 shadow-md shadow-blue-500/20">
-                      <Clock className="w-8 h-8 text-white" />
-                    </div>
-                    <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                      Services & Operations
-                    </h2>
-                    <p className="text-gray-600 dark:text-gray-300">
-                      Configure your services and operating hours
-                    </p>
-                  </div>
-
-                  <div>
-                    <Label className="text-base font-medium">
-                      Services Offered
-                    </Label>
-                    <div className="grid grid-cols-2 gap-4 mt-3">
-                      {Object.entries(formData.services).map(
-                        ([service, enabled]) => (
-                          <div
-                            key={service}
-                            className="flex items-center space-x-2"
-                          >
-                            <Switch
-                              id={service}
-                              checked={enabled}
-                              onCheckedChange={(checked) =>
-                                updateNestedFormData(
-                                  "services",
-                                  service,
-                                  checked
-                                )
-                              }
-                            />
-                            <Label htmlFor={service} className="capitalize">
-                              {service.replace(/([A-Z])/g, " $1").trim()}
-                            </Label>
-                          </div>
-                        )
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid md:grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor="deliveryRadius">
-                        Delivery Radius (km)
-                      </Label>
-                      <Input
-                        id="deliveryRadius"
-                        type="number"
-                        value={formData.deliveryRadius}
-                        onChange={(e) =>
-                          updateFormData("deliveryRadius", e.target.value)
-                        }
-                        placeholder="5"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="deliveryFee">Delivery Fee (USDC)</Label>
-                      <Input
-                        id="deliveryFee"
-                        type="number"
-                        step="0.01"
-                        value={formData.deliveryFee}
-                        onChange={(e) =>
-                          updateFormData("deliveryFee", e.target.value)
-                        }
-                        placeholder="2.50"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="minimumOrderValue">
-                        Minimum Order (USDC)
-                      </Label>
-                      <Input
-                        id="minimumOrderValue"
-                        type="number"
-                        step="0.01"
-                        value={formData.minimumOrderValue}
-                        onChange={(e) =>
-                          updateFormData("minimumOrderValue", e.target.value)
-                        }
-                        placeholder="10.00"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label className="text-base font-medium">
-                      Operating Hours
-                    </Label>
-                    <div className="space-y-3 mt-3">
-                      {Object.entries(formData.operatingHours).map(
-                        ([day, hours]) => (
-                          <div
-                            key={day}
-                            className="flex items-center space-x-4"
-                          >
-                            <div className="w-20">
-                              <Switch
-                                checked={hours.isOpen}
-                                onCheckedChange={(checked) =>
-                                  updateOperatingHours(day, "isOpen", checked)
-                                }
-                              />
-                            </div>
-                            <div className="w-24 capitalize font-medium">
-                              {day}
-                            </div>
-                            {hours.isOpen ? (
-                              <div className="flex items-center space-x-2">
-                                <Input
-                                  type="time"
-                                  value={hours.open}
-                                  onChange={(e) =>
-                                    updateOperatingHours(
-                                      day,
-                                      "open",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-32"
-                                />
-                                <span>to</span>
-                                <Input
-                                  type="time"
-                                  value={hours.close}
-                                  onChange={(e) =>
-                                    updateOperatingHours(
-                                      day,
-                                      "close",
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-32"
-                                />
-                              </div>
-                            ) : (
-                              <span className="text-gray-500">Closed</span>
-                            )}
-                          </div>
-                        )
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center space-x-2 mb-3">
-                      <Switch
-                        id="acceptsInsurance"
-                        checked={formData.acceptsInsurance}
-                        onCheckedChange={(checked) =>
-                          updateFormData("acceptsInsurance", checked)
-                        }
-                      />
-                      <Label
-                        htmlFor="acceptsInsurance"
-                        className="text-base font-medium"
-                      >
-                        Accept Insurance
-                      </Label>
-                    </div>
-                    {formData.acceptsInsurance && (
-                      <div className="grid grid-cols-2 gap-3">
-                        {insuranceProviders.map((provider) => (
-                          <div
-                            key={provider}
-                            className="flex items-center space-x-2"
-                          >
-                            <Checkbox
-                              id={provider}
-                              checked={formData.insuranceProviders.includes(
-                                provider
-                              )}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  updateFormData("insuranceProviders", [
-                                    ...formData.insuranceProviders,
-                                    provider,
-                                  ]);
-                                } else {
-                                  updateFormData(
-                                    "insuranceProviders",
-                                    formData.insuranceProviders.filter(
-                                      (p) => p !== provider
-                                    )
-                                  );
-                                }
-                              }}
-                            />
-                            <Label htmlFor={provider} className="text-sm">
-                              {provider}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Step 5: Review & Submit */}
-              {currentStep === 5 && (
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -1719,7 +1431,7 @@ export default function PharmacyOnboardingPage() {
                       <CheckCircle className="w-8 h-8 text-white" />
                     </div>
                     <h2 className="text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2">
-                      Review & Submit
+                      Review &amp; Submit
                     </h2>
                     <p className="text-gray-600 dark:text-gray-300">
                       Review your information before submitting
@@ -1796,20 +1508,22 @@ export default function PharmacyOnboardingPage() {
                         </div>
                       </div>
 
-                      <div>
-                        <h4 className="font-medium mb-2">Services</h4>
-                        <div className="flex flex-wrap gap-2">
-                          {Object.entries(formData.services)
-                            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                            .filter(([_, enabled]) => enabled)
-                            .map(([service]) => (
-                              <span
-                                key={service}
-                                className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs rounded-full capitalize"
-                              >
-                                {service.replace(/([A-Z])/g, " $1").trim()}
-                              </span>
-                            ))}
+                      <div className="grid md:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600 dark:text-gray-300">
+                            Pharmacy License:
+                          </span>
+                          <p className="font-medium text-green-600">
+                            {formData.pharmacyLicense ? `\u2713 ${formData.pharmacyLicense.name}` : "Not uploaded"}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-gray-600 dark:text-gray-300">
+                            Business Registration:
+                          </span>
+                          <p className="font-medium text-green-600">
+                            {formData.businessRegistration ? `\u2713 ${formData.businessRegistration.name}` : "Not uploaded"}
+                          </p>
                         </div>
                       </div>
                     </CardContent>

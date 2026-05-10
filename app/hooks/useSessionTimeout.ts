@@ -3,19 +3,11 @@
 import { useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
-// ─── Configurable timeouts ───────────────────────────────────────────────────
+// Configurable timeouts
 const INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000;  // 30 minutes of inactivity
 const ABSOLUTE_SESSION_MS   =  8 * 60 * 60 * 1000; // 8-hour hard cap
 const STORAGE_KEY_LOGIN_AT  = "epoch_session_login_at";
-// ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Drop this hook into any authenticated dashboard page.
- * It will:
- *   1. Record the login timestamp on first use.
- *   2. Reset an inactivity timer on every user-interaction event.
- *   3. Sign the user out and push to /signin when either timeout fires.
- */
 export function useSessionTimeout() {
   const router = useRouter();
   const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -43,14 +35,14 @@ export function useSessionTimeout() {
   }, [signOutAndRedirect]);
 
   useEffect(() => {
-    // ── 1. Record / read login timestamp ────────────────────────────────────
+    // 1. Record / read login timestamp
     let loginAt = Number(localStorage.getItem(STORAGE_KEY_LOGIN_AT));
     if (!loginAt) {
       loginAt = Date.now();
       localStorage.setItem(STORAGE_KEY_LOGIN_AT, String(loginAt));
     }
 
-    // ── 2. Absolute session cap ──────────────────────────────────────────────
+    // 2. Absolute session cap
     const elapsed    = Date.now() - loginAt;
     const remaining  = ABSOLUTE_SESSION_MS - elapsed;
 
@@ -65,7 +57,7 @@ export function useSessionTimeout() {
       remaining
     );
 
-    // ── 3. Inactivity timer – start & bind events ────────────────────────────
+    // 3. Inactivity timer – start & bind events
     resetInactivityTimer();
 
     const activityEvents = [
@@ -77,7 +69,7 @@ export function useSessionTimeout() {
       window.addEventListener(evt, resetInactivityTimer, { passive: true })
     );
 
-    // ── Cleanup on unmount ───────────────────────────────────────────────────
+    // Cleanup on unmount
     return () => {
       if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
       if (absoluteTimer.current)   clearTimeout(absoluteTimer.current);

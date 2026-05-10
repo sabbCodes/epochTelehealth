@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Shield, User, ArrowLeft, ArrowRight } from "lucide-react";
+import { Shield, User, ArrowLeft, ArrowRight, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -48,6 +48,13 @@ export default function AdminOnboardingPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
+  // Profile image — kept in separate state (Files can't be serialised to localStorage)
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
+  const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const MAX_IMAGE_SIZE = 1024 * 1024; // 1 MB
+
   // Save state on every change (safe — state is already hydrated from localStorage above)
   useEffect(() => {
     localStorage.setItem("epoch_admin_onboarding", JSON.stringify(formData));
@@ -63,6 +70,40 @@ export default function AdminOnboardingPage() {
     setFormData((prev: typeof formData) => ({ ...prev, [field]: value }));
     if (errors[field]) {
       setErrors((prev: Record<string, string>) => ({ ...prev, [field]: "" }));
+    }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      toast({
+        variant: "destructive",
+        title: "Invalid file type",
+        description: "Please upload an image file (JPEG, PNG, etc.)",
+      });
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_SIZE) {
+      toast({
+        variant: "destructive",
+        title: "File too large",
+        description: `Image must be under 1 MB. Selected file is ${(file.size / 1024 / 1024).toFixed(2)} MB.`,
+      });
+      e.target.value = "";
+      return;
+    }
+
+    setProfileImageFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setProfileImagePreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+
+    if (errors.profileImage) {
+      setErrors((prev) => ({ ...prev, profileImage: "" }));
     }
   };
 
@@ -92,19 +133,23 @@ export default function AdminOnboardingPage() {
     setIsLoading(true);
 
     try {
+      const formDataToSend = new FormData();
+      formDataToSend.append("email", email);
+      formDataToSend.append("userType", "admin");
+      formDataToSend.append("walletAddress", walletAddress);
+      formDataToSend.append("firstName", formData.firstName);
+      formDataToSend.append("lastName", formData.lastName);
+      formDataToSend.append("phone", formData.phone);
+      formDataToSend.append("role", formData.role);
+      formDataToSend.append("department", formData.department);
+      if (profileImageFile) {
+        formDataToSend.append("profileImage", profileImageFile, profileImageFile.name);
+      }
+
       const response = await fetch("/api/user/profile", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          userType: "admin",
-          walletAddress,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          phone: formData.phone,
-          role: formData.role,
-          department: formData.department,
-        }),
+        // No Content-Type header — browser sets multipart/form-data with correct boundary
+        body: formDataToSend,
       });
 
       const data = await response.json();
@@ -150,16 +195,15 @@ export default function AdminOnboardingPage() {
         animate={{ opacity: 1, x: 0 }}
         className="fixed top-6 left-6 z-50"
       >
-        <Link href="/account-type-selection">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-        </Link>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.back()}
+          className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border border-gray-200 dark:border-gray-700 hover:bg-white dark:hover:bg-gray-800"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back
+        </Button>
       </motion.div>
 
       <div className="flex items-center justify-center min-h-screen p-4 relative z-10">
@@ -215,6 +259,51 @@ export default function AdminOnboardingPage() {
                 )}
               </CardHeader>
               <CardContent className="space-y-4">
+
+                {/* Profile Image Upload */}
+                <div className="flex flex-col items-center py-2">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-24 h-24 rounded-full bg-gray-100 dark:bg-gray-700 border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center overflow-hidden hover:border-[#004DFF] transition-colors focus:outline-none focus:ring-2 focus:ring-[#004DFF] focus:ring-offset-2"
+                    >
+                      {profileImagePreview ? (
+                        <Image
+                          src={profileImagePreview}
+                          alt="Profile preview"
+                          width={96}
+                          height={96}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center text-gray-400">
+                          <Camera className="w-7 h-7 mb-1" />
+                          <span className="text-xs">Upload</span>
+                        </div>
+                      )}
+                    </button>
+                    {/* Camera badge */}
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="absolute bottom-0 right-0 w-7 h-7 bg-[#004DFF] rounded-full flex items-center justify-center shadow-md hover:bg-[#003bbd] transition-colors"
+                    >
+                      <Camera className="w-3.5 h-3.5 text-white" />
+                    </button>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
+                  <p className="text-xs text-gray-400 mt-2">Profile photo · optional · max 1 MB</p>
+                  {errors.profileImage && (
+                    <p className="text-red-500 text-xs mt-1">{errors.profileImage}</p>
+                  )}
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="firstName">First Name *</Label>
@@ -257,8 +346,13 @@ export default function AdminOnboardingPage() {
                   <Input
                     id="phone"
                     value={formData.phone}
-                    onChange={(e) => handleInputChange("phone", e.target.value)}
-                    placeholder="Enter phone number"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "" || /^\+?\d*$/.test(val)) {
+                        handleInputChange("phone", val);
+                      }
+                    }}
+                    placeholder="+234 xxx xxx xxxx"
                     className={errors.phone ? "border-red-500" : ""}
                   />
                   {errors.phone && (
@@ -285,15 +379,31 @@ export default function AdminOnboardingPage() {
 
                 <div>
                   <Label htmlFor="department">Department *</Label>
-                  <Input
-                    id="department"
+                  <Select
                     value={formData.department}
-                    onChange={(e) =>
-                      handleInputChange("department", e.target.value)
+                    onValueChange={(value) =>
+                      handleInputChange("department", value)
                     }
-                    placeholder="Enter department"
-                    className={errors.department ? "border-red-500" : ""}
-                  />
+                  >
+                    <SelectTrigger
+                      id="department"
+                      className={errors.department ? "border-red-500" : ""}
+                    >
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="operations">Operations</SelectItem>
+                      <SelectItem value="clinical">Clinical Services</SelectItem>
+                      <SelectItem value="pharmacy">Pharmacy Management</SelectItem>
+                      <SelectItem value="patient_support">Patient Support</SelectItem>
+                      <SelectItem value="finance">Finance & Billing</SelectItem>
+                      <SelectItem value="compliance">Compliance & Legal</SelectItem>
+                      <SelectItem value="it">IT & Engineering</SelectItem>
+                      <SelectItem value="hr">Human Resources</SelectItem>
+                      <SelectItem value="marketing">Marketing & Growth</SelectItem>
+                      <SelectItem value="executive">Executive</SelectItem>
+                    </SelectContent>
+                  </Select>
                   {errors.department && (
                     <p className="text-red-500 text-sm mt-1">
                       {errors.department}

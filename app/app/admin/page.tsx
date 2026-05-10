@@ -26,6 +26,7 @@ import {
   Database,
   Globe,
   PieChart,
+  RefreshCw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -118,8 +119,16 @@ export default function AdminDashboard() {
     doctors: 0,
     pharmacies: 0,
     pendingVerifications: 0,
+    revenue: 0,
   })
+  const [pendingDocs, setPendingDocs] = useState<any[]>([])
+  const [selectedVerification, setSelectedVerification] = useState<any | null>(null)
+  const [reviewModalOpen, setReviewModalOpen] = useState(false)
+  const [actionReason, setActionReason] = useState("")
+  const [submittingAction, setSubmittingAction] = useState(false)
+  
   const [isLoadingCounts, setIsLoadingCounts] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const { toast } = useToast()
 
   // Responsive sidebar
@@ -133,32 +142,61 @@ export default function AdminDashboard() {
     return () => window.removeEventListener("resize", handleResize)
   }, [])
 
-  // Fetch real counts
-  useEffect(() => {
-    const fetchCounts = async () => {
-      try {
-        const [
-          { count: userCount },
-          { count: doctorCount },
-          { count: pharmacyCount },
-        ] = await Promise.all([
-          supabase.from("user_profiles").select("*", { count: "exact", head: true }),
-          supabase.from("doctor_profiles").select("*", { count: "exact", head: true }),
-          supabase.from("pharmacy_profiles").select("*", { count: "exact", head: true }),
-        ])
+  const fetchCounts = async (silent = false) => {
+    if (!silent) setIsLoadingCounts(true);
+    else setIsRefreshing(true);
+    try {
+      const res = await fetch('/api/admin/dashboard-stats');
+      const json = await res.json();
+      
+      if (!res.ok) throw new Error(json.error || "Failed to fetch stats");
+      
+      const {
+        allUserCount,
+        doctorCount,
+        pharmacyCount,
+        pendingDoctors,
+        pendingPharmacies,
+        schedulesData,
+        doctorsData
+      } = json.data;
 
-        setCounts({
-          users: userCount || 0,
-          doctors: doctorCount || 0,
-          pharmacies: pharmacyCount || 0,
-          pendingVerifications: 3, // Mock for now as verification system might be complex
-        })
-      } catch (err) {
-        console.error("Error fetching counts:", err)
-      } finally {
-        setIsLoadingCounts(false)
+      let revenue = 0;
+      if (schedulesData && doctorsData) {
+        schedulesData.forEach((schedule: any) => {
+          const doc = doctorsData.find((d: any) => d.id === schedule.doctor_id || d.user_profile_id === schedule.doctor_id);
+          if (doc && doc.consultation_fee) {
+            revenue += doc.consultation_fee;
+          }
+        });
       }
+
+      const totalPending = (pendingDoctors?.length || 0) + (pendingPharmacies?.length || 0);
+
+      setCounts({
+        users: allUserCount || 0,
+        doctors: doctorCount || 0,
+        pharmacies: pharmacyCount || 0,
+        pendingVerifications: totalPending,
+        revenue: revenue,
+      })
+      
+      const combinedPending = [
+        ...(pendingDoctors || []).map((d: any) => ({ ...d, accountType: 'doctor' })),
+        ...(pendingPharmacies || []).map((p: any) => ({ ...p, accountType: 'pharmacy' }))
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      setPendingDocs(combinedPending)
+    } catch (err) {
+      console.error("Error fetching counts:", err)
+    } finally {
+      setIsLoadingCounts(false);
+      setIsRefreshing(false);
     }
+  }
+
+  // Fetch real counts on mount
+  useEffect(() => {
     fetchCounts()
   }, [])
 
@@ -199,7 +237,7 @@ export default function AdminDashboard() {
     },
     {
       title: "Platform Revenue",
-      value: "145.7 SOL",
+      value: isLoadingCounts ? "..." : `$${counts.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
       change: "+23% trend",
       icon: DollarSign,
       color: "#8B5CF6",
@@ -231,37 +269,51 @@ export default function AdminDashboard() {
     },
   ]
 
-  const pendingVerifications = [
+  const pendingVerifications = pendingDocs.length > 0 ? pendingDocs.map((doc) => {
+    if (doc.accountType === 'pharmacy') {
+      const pharmDocs = [doc.license_url, doc.registration_url].filter(Boolean);
+      return {
+        id: doc.id,
+        user_profile_id: doc.user_profile_id,
+        accountType: 'pharmacy',
+        name: doc.pharmacy_name || "Unknown Pharmacy",
+        specialty: "Pharmacy",
+        country: doc.country || "Unknown",
+        submittedDate: new Date(doc.created_at).toISOString().split('T')[0],
+        documents: pharmDocs,
+        status: doc.verification_status || "pending",
+        avatar: doc.profile_image || "/placeholder.svg?height=40&width=40",
+        raw_data: doc,
+      }
+    }
+    
+    const docDocs = [doc.medical_license_url, ...(doc.certifications || [])].filter(Boolean);
+    return {
+      id: doc.id,
+      user_profile_id: doc.user_profile_id,
+      accountType: 'doctor',
+      name: `Dr. ${doc.first_name} ${doc.last_name}`,
+      specialty: doc.specialization || "General Practice",
+      country: doc.country || "Unknown",
+      submittedDate: new Date(doc.created_at).toISOString().split('T')[0],
+      documents: docDocs,
+      status: doc.verification_status || "pending",
+      avatar: doc.profile_image || "/placeholder.svg?height=40&width=40",
+      raw_data: doc,
+    }
+  }) : [
     {
-      id: 1,
-      name: "Dr. Sarah Johnson",
-      specialty: "Cardiology",
-      country: "Nigeria",
-      submittedDate: "2024-01-15",
-      documents: ["Medical License", "Degree Certificate", "ID"],
-      status: "pending",
+      id: "empty",
+      accountType: "none",
+      name: "No pending verifications",
+      specialty: "-",
+      country: "-",
+      submittedDate: "-",
+      documents: [],
+      status: "approved",
       avatar: "/placeholder.svg?height=40&width=40",
-    },
-    {
-      id: 2,
-      name: "Dr. Ahmed Hassan",
-      specialty: "Pediatrics",
-      country: "Egypt",
-      submittedDate: "2024-01-14",
-      documents: ["Medical License", "Degree Certificate"],
-      status: "under_review",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
-    {
-      id: 3,
-      name: "Dr. Maria Santos",
-      specialty: "Dermatology",
-      country: "Brazil",
-      submittedDate: "2024-01-13",
-      documents: ["Medical License", "Degree Certificate", "ID", "Hospital Affiliation"],
-      status: "pending",
-      avatar: "/placeholder.svg?height=40&width=40",
-    },
+      raw_data: null,
+    }
   ]
 
   const recentActivity = [
@@ -304,12 +356,55 @@ export default function AdminDashboard() {
   ]
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    switch (status?.toLowerCase()) {
       case "pending": return "bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"
       case "under_review": return "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400"
       case "approved": return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400"
       case "rejected": return "bg-rose-100 text-rose-700 dark:bg-rose-900/20 dark:text-rose-400"
       default: return "bg-slate-100 text-slate-700 dark:bg-slate-900/20 dark:text-slate-400"
+    }
+  }
+
+  const handleVerificationAction = async (action: 'approve' | 'reject') => {
+    if (!selectedVerification) return;
+    if (action === 'reject' && !actionReason.trim()) {
+      toast({ title: "Reason Required", description: "Please provide a reason for rejection.", variant: "destructive" });
+      return;
+    }
+    
+    setSubmittingAction(true);
+    try {
+      const res = await fetch('/api/admin/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: selectedVerification.user_profile_id,
+          profileId: selectedVerification.id,
+          role: selectedVerification.accountType,
+          action,
+          reason: actionReason
+        })
+      });
+      
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to process verification.");
+      
+      toast({
+        title: action === 'approve' ? "Approved" : "Rejected",
+        description: `Successfully ${action}d ${selectedVerification.name}.`
+      });
+      
+      // Update local state to remove the processed verification
+      setPendingDocs(prev => prev.filter(doc => doc.id !== selectedVerification.id));
+      setCounts(prev => ({ ...prev, pendingVerifications: Math.max(0, prev.pendingVerifications - 1) }));
+      
+      setReviewModalOpen(false);
+      setSelectedVerification(null);
+      setActionReason("");
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setSubmittingAction(false);
     }
   }
 
@@ -436,10 +531,6 @@ export default function AdminDashboard() {
           </div>
           <div className="flex items-center gap-3">
             <NotificationDropdown userId={adminProfile?.id || ""} />
-            <button className="p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl relative">
-              <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-rose-500 rounded-full border-2 border-white dark:border-slate-800" />
-            </button>
           </div>
         </header>
 
@@ -570,6 +661,14 @@ export default function AdminDashboard() {
                     <SelectItem value="under_review">Under Review</SelectItem>
                   </SelectContent>
                 </Select>
+                <button
+                  onClick={() => fetchCounts(true)}
+                  disabled={isRefreshing}
+                  className="flex items-center gap-2 px-4 h-11 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 font-medium transition-colors disabled:opacity-50 text-sm shrink-0"
+                >
+                  <RefreshCw size={15} className={isRefreshing ? 'animate-spin' : ''} />
+                  {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                </button>
               </div>
 
               <div className="space-y-4">
@@ -587,7 +686,7 @@ export default function AdminDashboard() {
                             <Avatar className="w-14 h-14 border-2 border-slate-100 dark:border-slate-700 shadow-sm">
                               <AvatarImage src={verification.avatar} />
                               <AvatarFallback className="bg-blue-50 text-[#004DFF] font-bold">
-                                {verification.name.split(" ").map(n => n[0]).join("")}
+                                {verification.name.split(" ").map((n: string) => n[0]).join("")}
                               </AvatarFallback>
                             </Avatar>
                             <div>
@@ -595,7 +694,7 @@ export default function AdminDashboard() {
                               <p className="text-sm font-medium text-slate-500">{verification.specialty} • {verification.country}</p>
                               <div className="flex items-center gap-4 mt-2">
                                 <span className="text-xs text-slate-400 flex items-center gap-1">
-                                  <Activity size={12} /> {verification.documents.length} Docs
+                                  <Activity size={12} /> {verification.documents?.length || 0} Docs
                                 </span>
                                 <span className="text-xs text-slate-400 flex items-center gap-1">
                                   <Search size={12} /> {verification.submittedDate}
@@ -609,8 +708,19 @@ export default function AdminDashboard() {
                                {verification.status.replace("_", " ").toUpperCase()}
                              </Badge>
                              <div className="h-8 w-[1px] bg-slate-100 dark:bg-slate-700 mx-2 hidden md:block" />
-                             <Button variant="outline" className="rounded-xl font-bold h-10 px-4 mt-0">Review Docs</Button>
-                             <Button className="bg-[#004DFF] hover:bg-blue-700 text-white rounded-xl font-bold h-10 px-5 border-none">Approve</Button>
+                             {verification.id !== "empty" && (
+                               <Button 
+                                 variant="outline" 
+                                 className="rounded-xl font-bold h-10 px-4 mt-0"
+                                 onClick={() => {
+                                   setSelectedVerification(verification);
+                                   setActionReason("");
+                                   setReviewModalOpen(true);
+                                 }}
+                               >
+                                 Review
+                               </Button>
+                             )}
                           </div>
                         </div>
                       </CardContent>
@@ -690,6 +800,125 @@ export default function AdminDashboard() {
             </TabsContent>
           </Tabs>
         </div>
+
+        {/* Verification Review Modal */}
+        {reviewModalOpen && selectedVerification && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-slate-100 dark:border-slate-700"
+            >
+              <div className="flex justify-between items-center p-6 border-b border-slate-100 dark:border-slate-700">
+                <h2 className="text-xl font-bold flex items-center gap-2">
+                  <Shield className="text-[#004DFF]" size={20} />
+                  Review {selectedVerification.accountType === 'doctor' ? 'Doctor' : 'Pharmacy'} Application
+                </h2>
+                <button onClick={() => setReviewModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+                  <X size={20} />
+                </button>
+              </div>
+              
+              <div className="p-6 overflow-y-auto flex-1 space-y-6">
+                <div className="flex items-center gap-4">
+                  <Avatar className="w-16 h-16 border-2 border-slate-100 dark:border-slate-700">
+                    <AvatarImage src={selectedVerification.avatar} />
+                    <AvatarFallback className="bg-blue-50 text-[#004DFF] font-bold text-xl">
+                      {selectedVerification.name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h3 className="text-xl font-bold">{selectedVerification.name}</h3>
+                    <p className="text-slate-500 font-medium">{selectedVerification.specialty} • {selectedVerification.country}</p>
+                    <Badge className="mt-1 bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300">
+                      ID: {selectedVerification.id.split('-')[0]}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* General Info */}
+                  <div className="space-y-4 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700/50">
+                    <h4 className="font-bold text-sm text-slate-500 uppercase tracking-wider mb-2">Registration Details</h4>
+                    {selectedVerification.accountType === 'doctor' ? (
+                      <>
+                        <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2"><span className="text-slate-500">License #</span><span className="font-medium">{selectedVerification.raw_data?.license_number || 'N/A'}</span></div>
+                        <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2"><span className="text-slate-500">Experience</span><span className="font-medium">{selectedVerification.raw_data?.years_of_experience || 0} Years</span></div>
+                        <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2"><span className="text-slate-500">Consultation Fee</span><span className="font-medium">${selectedVerification.raw_data?.consultation_fee || '0'}</span></div>
+                        <div className="flex justify-between"><span className="text-slate-500">Education</span><span className="font-medium truncate max-w-[150px]">{selectedVerification.raw_data?.education || 'N/A'}</span></div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2"><span className="text-slate-500">License #</span><span className="font-medium">{selectedVerification.raw_data?.license_number || 'N/A'}</span></div>
+                        <div className="flex justify-between border-b border-slate-200 dark:border-slate-700 pb-2"><span className="text-slate-500">City</span><span className="font-medium">{selectedVerification.raw_data?.city || 'N/A'}</span></div>
+                        <div className="flex justify-between"><span className="text-slate-500">Operating Hours</span><span className="font-medium">See Schedule</span></div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Documents */}
+                  <div className="space-y-4 bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700/50">
+                    <h4 className="font-bold text-sm text-slate-500 uppercase tracking-wider mb-2">Uploaded Documents</h4>
+                    {selectedVerification.documents && selectedVerification.documents.length > 0 ? (
+                      <div className="space-y-2">
+                        {selectedVerification.documents.map((doc: string, idx: number) => (
+                          <a key={idx} href={doc} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-3 bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-[#004DFF] transition-colors group">
+                            <Download size={16} className="text-slate-400 group-hover:text-[#004DFF]" />
+                            <span className="text-sm font-medium truncate flex-1">{doc.split('/').pop() || `Document ${idx+1}`}</span>
+                          </a>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-slate-500 italic">No documents uploaded.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h4 className="font-bold text-sm text-slate-500 uppercase tracking-wider">Bio / Description</h4>
+                  <p className="text-sm bg-slate-50 dark:bg-slate-900/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700/50 text-slate-700 dark:text-slate-300">
+                    {selectedVerification.raw_data?.bio || "No description provided."}
+                  </p>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
+                  <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Rejection Reason (if rejecting)</label>
+                  <textarea 
+                    value={actionReason}
+                    onChange={(e) => setActionReason(e.target.value)}
+                    placeholder="E.g., Document upload is unclear, or consultation fee is abnormally high..."
+                    className="w-full p-3 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm outline-none focus:ring-2 focus:ring-[#004DFF]/20 min-h-[80px]"
+                  />
+                </div>
+              </div>
+              
+              <div className="p-6 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setReviewModalOpen(false)}
+                  disabled={submittingAction}
+                  className="rounded-xl font-bold h-11"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={() => handleVerificationAction('reject')}
+                  disabled={submittingAction}
+                  className="rounded-xl font-bold h-11 bg-rose-500 hover:bg-rose-600 text-white border-none"
+                >
+                  {submittingAction ? "Processing..." : "Reject Application"}
+                </Button>
+                <Button 
+                  onClick={() => handleVerificationAction('approve')}
+                  disabled={submittingAction}
+                  className="rounded-xl font-bold h-11 bg-emerald-500 hover:bg-emerald-600 text-white border-none"
+                >
+                  {submittingAction ? "Processing..." : "Approve Application"}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </main>
     </div>
   )
