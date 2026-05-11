@@ -941,30 +941,52 @@ export default function DoctorChatPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Feedback Dialog */}
-      <AlertDialog open={showFeedbackModal} onOpenChange={setShowFeedbackModal}>
-        <AlertDialogContent className="bg-slate-900 border-slate-700/50">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">Session Completed 🎉</AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-400">
-              The consultation has ended successfully. Would you like to share your experience on X (Twitter)? Your feedback helps us grow!
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700">Maybe Later</AlertDialogCancel>
-            <AlertDialogAction 
-              className="bg-black hover:bg-slate-800 text-white border border-slate-700"
-              onClick={() => {
-                const text = encodeURIComponent("Just completed another successful telehealth consultation on Epoch! 🩺💻 Seamless experience and great patient care. The future of medicine is here. @EpochTelehealth #SolanaDoctor");
-                window.open(`https://twitter.com/intent/tweet?text=${text}`, "_blank");
-              }}
+      {/* Review / Share Dialog */}
+      <AnimatePresence>
+        {showFeedbackModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.85, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.85, opacity: 0, y: 20 }}
+              transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+              className="bg-slate-900 border border-slate-700/60 rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-5"
             >
-              <svg className="w-4 h-4 mr-2 fill-current" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-              Post on X
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              <div className="mx-auto w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center">
+                <svg viewBox="0 0 24 24" fill="none" className="w-8 h-8 text-emerald-400" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-slate-100">Consultation Complete</h2>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                Great session! Share your experience on <strong className="text-white">X (Twitter)</strong> and help others discover quality telehealth care.
+              </p>
+              <a
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent('Just completed another great telehealth consultation on @epochtelehealth! 🩺✨ Seamless, secure, and professional. The future of healthcare is here. #EpochTelehealth #Telehealth')}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-center gap-2.5 w-full py-3 px-5 bg-[#1DA1F2] hover:bg-[#1a94df] text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-900/30 active:scale-[0.98]"
+              >
+                <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.743l7.734-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+                Post on X
+              </a>
+              <button
+                onClick={() => setShowFeedbackModal(false)}
+                className="w-full py-2.5 text-sm text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                Skip &amp; Continue
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col min-w-0">
