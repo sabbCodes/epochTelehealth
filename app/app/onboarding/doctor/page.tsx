@@ -446,7 +446,6 @@ export default function DoctorOnboardingPage() {
         specialty: formData.specialty,
         licenseNumber: formData.licenseNumber,
         yearsOfExperience: parseInt(formData.yearsOfExperience) || 0,
-        education: formData.education,
         isVerified: false,
         hospitalAffiliation: formData.hospitalAffiliation,
         consultationFee30minChat: parseFloat(formData.consultationFee30minChat) || 0,

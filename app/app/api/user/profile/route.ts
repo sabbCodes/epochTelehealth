@@ -387,7 +387,12 @@ export async function POST(request: Request) {
           specialty: formData.specialty,
           licenseNumber: formData.licenseNumber,
           yearsOfExperience: formData.yearsOfExperience,
-          education: formData.education,
+          // Ensure education is always an array or null
+          education: Array.isArray(formData.education)
+            ? formData.education
+            : typeof formData.education === 'string' && formData.education
+              ? formData.education.split(',').map((e: string) => e.trim()).filter(Boolean)
+              : null,
           hospitalAffiliation: formData.hospitalAffiliation,
           bio: formData.bio,
           consultationFee30minChat: formData.consultationFee30minChat,
@@ -396,7 +401,7 @@ export async function POST(request: Request) {
           medicalLicense: formData.medicalLicense,
           medicalDegree: formData.medicalDegree,
           availability: availability,
-          languages: languages,
+          languages: languages.length > 0 ? languages : null,
           profileImage: formData.profileImage || profileData.profileImage,
         };
 
